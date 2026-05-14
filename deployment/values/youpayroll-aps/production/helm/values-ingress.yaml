@@ -1,0 +1,33 @@
+ingress:
+  apiVersion: 'networking.k8s.io/v1'
+
+  namespace: 'youpayroll-aps'
+  name: 'youpayroll-aps-ingress'
+
+  annotations:
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/backend-protocol: 'HTTP'
+    alb.ingress.kubernetes.io/certificate-arn: 'arn:aws:acm:ap-south-1:844294577846:certificate/b65a84af-dbbc-45ee-a6b4-c36d1210ab89'
+    alb.ingress.kubernetes.io/group.name: 'default2'
+    alb.ingress.kubernetes.io/healthcheck-path: '/health/'
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/scheme: 'internet-facing'
+    alb.ingress.kubernetes.io/tags: 'Name=ygag-production-default2-alb-eks-tf, Platform=EKS, Environment=production'
+    alb.ingress.kubernetes.io/wafv2-acl-arn: 'arn:aws:wafv2:ap-south-1:844294577846:regional/webacl/AWSRegionalWAF2/a691c813-d84e-4501-966b-5e2b45240118'
+    alb.ingress.kubernetes.io/target-type: 'ip'
+    alb.ingress.kubernetes.io/subnets: 'ygag-production-default-public-ap-south-1a-tf, ygag-production-default-public-ap-south-1b-tf, ygag-production-default-public-ap-south-1c-tf'
+    alb.ingress.kubernetes.io/ssl-policy: 'ELBSecurityPolicy-TLS13-1-2-Ext2-2021-06'
+    alb.ingress.kubernetes.io/load-balancer-attributes: 'access_logs.s3.enabled=true,access_logs.s3.bucket=ygag-production-ap-south-1-alb-logs-tf,access_logs.s3.prefix=default2-public,idle_timeout.timeout_seconds=180'
+    kubernetes.io/ingress.class: 'alb'
+
+  rules:
+    - host: 'youpayroll.yougotagift.com'
+      http:
+        paths:
+          - backend:
+              service:
+                name: 'youpayroll-aps-nginx'
+                port:
+                  number: 80
+            path: '/*'
+            pathType: 'ImplementationSpecific'

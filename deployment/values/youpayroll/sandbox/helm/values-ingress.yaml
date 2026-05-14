@@ -1,0 +1,32 @@
+ingress:
+  apiVersion: 'networking.k8s.io/v1'
+
+  namespace: 'youpayroll'
+  name: 'youpayroll-ingress'
+
+  annotations:
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/backend-protocol: 'HTTP'
+    alb.ingress.kubernetes.io/certificate-arn: 'arn:aws:acm:me-central-1:843554671018:certificate/410201eb-1cc7-4a70-8f5f-8111d25a9ff8'
+    alb.ingress.kubernetes.io/group.name: 'default'
+    alb.ingress.kubernetes.io/healthcheck-path: '/health/'
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/scheme: 'internet-facing'
+    alb.ingress.kubernetes.io/tags: 'Name=ygg-sandbox-default-alb-eks-tf, Platform=EKS, Environment=sandbox'
+    alb.ingress.kubernetes.io/wafv2-acl-arn: 'arn:aws:wafv2:me-central-1:843554671018:regional/webacl/AWSRegionalWAF2/b854d487-34ca-4786-9270-500fedcbb502'
+    alb.ingress.kubernetes.io/target-type: 'ip'
+    alb.ingress.kubernetes.io/subnets: 'ygg-sand-public-me-central-1a, ygg-sand-public-me-central-1b, ygg-sand-public-me-central-1c'
+    alb.ingress.kubernetes.io/load-balancer-attributes: 'idle_timeout.timeout_seconds=120'
+    kubernetes.io/ingress.class: 'alb'
+
+  rules:
+    - host: 'youpayroll.sandbox.yougotagift.com'
+      http:
+        paths:
+          - backend:
+              service:
+                name: 'youpayroll-nginx'
+                port:
+                  number: 80
+            path: '/*'
+            pathType: 'ImplementationSpecific'

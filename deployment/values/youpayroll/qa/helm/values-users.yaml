@@ -1,0 +1,5 @@
+users:
+  - service_account:
+      create: 'true'
+      name: 'ygag-youpayroll-vault'
+      namespace: 'youpayroll-[JIRA_ID]'

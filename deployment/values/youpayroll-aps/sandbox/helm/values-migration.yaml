@@ -1,0 +1,48 @@
+namespace: 'youpayroll-aps'
+
+app_name: 'youpayroll-aps'
+
+job:
+  name: 'youpayroll-aps-migration-job-[BUILD_TAG]'
+  backoffLimit: 0
+  activeDeadlineSeconds: 900
+  ttlSecondsAfterFinished: 1800
+  serviceAccountName: 'ygag-youpayroll-aps-vault'
+
+  containers:
+    - name: 'migration'
+      imagePullPolicy: 'Always'
+      image: '459037613883.dkr.ecr.ap-south-1.amazonaws.com/production/ygag/youpayroll-aps/backend-app:[BUILD_TAG]'
+      command: '["sh", "-c", "source /vault/secrets/application.env ; source /vault/secrets/application-devops.env ; python3.11 manage.py migrate --noinput >> /ygag/logs/app.out.migration.log 2>&1"]'
+      env:
+        - name: 'DJANGO_SETTINGS_MODULE'
+          value: 'youpayroll.settings.sandbox'
+      memory:
+        requests: 1000Mi
+        limits: 1500Mi
+      cpu:
+        requests: 1000m
+        limits: 1500m
+      volumeMounts:
+        - mountPath: '/ygag/logs/'
+          name: 'ygag-youpayroll-aps-sandbox-migration-logs'
+        - name: 'youpayroll-aps-app-env-volume'
+          mountPath: "/vault/secrets"
+
+  volumes:
+    - name: 'ygag-youpayroll-aps-sandbox-migration-logs'
+      hostPath:
+        path: '/home/ec2-user/ygag-logs/ygag-youpayroll-aps-sandbox/migration'
+    - name: 'youpayroll-aps-app-env-volume'
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: "youpayroll-aps-envs"
+
+  nodeSelector:
+    key: 'karpenter.sh/nodepool'
+    value: 'default'
+  priorityClassName: 'sandbox-critical'
+  restartPolicy: 'Never'
+  terminationGracePeriodSeconds: 120

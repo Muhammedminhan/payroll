@@ -1,0 +1,50 @@
+namespace: 'youpayroll'
+
+app_name: 'youpayroll'
+
+job:
+  name: 'youpayroll-collectstatic-job-[BUILD_TAG]'
+  backoffLimit: 0
+  activeDeadlineSeconds: 900
+  ttlSecondsAfterFinished: 1800
+  serviceAccountName: 'ygag-youpayroll-vault'
+
+  containers:
+    - name: 'collectstatic'
+      imagePullPolicy: 'Always'
+      image: '459037613883.dkr.ecr.me-central-1.amazonaws.com/production/ygg/youpayroll/backend-app:[BUILD_TAG]'
+      command: '["sh", "-c", "source /vault/secrets/application.env ; source /vault/secrets/application-devops.env ;python3.11 manage.py collectstatic --no-input >> /ygag/logs/app.out.collectstatic.log 2>&1"]'
+      env:
+        - name: 'DJANGO_SETTINGS_MODULE'
+          value: 'youpayroll.settings.sandbox'
+      memory:
+        requests: 1000Mi
+        limits: 1500Mi
+      cpu:
+        requests: 1000m
+        limits: 1500m
+      volumeMounts:
+        - mountPath: '/ygag/logs/'
+          name: 'ygag-youpayroll-sandbox-collectstatic-logs'
+        - name: 'youpayroll-app-env-volume'
+          mountPath: "/vault/secrets"
+
+  volumes:
+    - name: 'ygag-youpayroll-sandbox-collectstatic-logs'
+      hostPath:
+        path: '/home/ec2-user/ygag-logs/ygag-youpayroll-sandbox/collectstatic'
+    - name: 'youpayroll-app-env-volume'
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: "youpayroll-envs"
+    
+    
+
+  nodeSelector:
+    key: 'karpenter.sh/nodepool'
+    value: 'default'
+  priorityClassName: 'sandbox-critical'
+  restartPolicy: 'Never'
+  terminationGracePeriodSeconds: 120

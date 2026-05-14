@@ -1,0 +1,75 @@
+services:
+  db:
+    image: postgres
+    volumes:
+      - ./data/postgres:/var/lib/postgresql
+    environment:
+      POSTGRES_DB: ${DATABASES_NAME:-youpayroll}
+      POSTGRES_USER: ${DATABASES_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASES_PASSWORD:-postgres}
+    ports:
+      - "127.0.0.1:${DB_HOST_PORT:-5433}:${DB_CONTAINER_PORT:-5432}"
+    restart: on-failure
+  redis:
+    image: redis:alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+  web:
+    restart: unless-stopped
+    build: .
+    command: gunicorn youpayroll.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
+    volumes:
+      - .:/youpayroll
+    ports:
+      - "${WEB_HOST_PORT:-8002}:8000"
+    depends_on:
+      - db
+      - redis
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key}
+      DEBUG: ${DEBUG:-True}
+      DATABASE_ENGINE: ${DATABASE_ENGINE:-django.db.backends.postgresql}
+      DATABASES_NAME: ${DATABASES_NAME:-youpayroll}
+      DATABASES_USER: ${DATABASES_USER:-postgres}
+      DATABASES_PASSWORD: ${DATABASES_PASSWORD:-postgres}
+      DATABASES_HOST: ${DATABASES_HOST:-db}
+      DATABASES_PORT: ${DATABASES_PORT:-5432}
+      AWS_S3_HOST: ${AWS_S3_HOST:-s3.amazonaws.com}
+      AWS_DEFAULT_ACL: ${AWS_DEFAULT_ACL:-private}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-dev}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-dev}
+      AWS_STORAGE_BUCKET_NAME: ${AWS_STORAGE_BUCKET_NAME:-dev-bucket}
+      AWS_CLOUDFRONT_DOMAIN: ${AWS_CLOUDFRONT_DOMAIN:-localhost}
+      AWS_S3_REGION_NAME: ${AWS_S3_REGION_NAME:-us-east-1}
+      AWS_QUERYSTRING_AUTH: ${AWS_QUERYSTRING_AUTH:-False}
+      AWS_S3_FILE_OVERWRITE: ${AWS_S3_FILE_OVERWRITE:-False}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+  celery:
+    build: .
+    command: celery -A youpayroll worker -l info -B
+    volumes:
+      - .:/youpayroll
+    depends_on:
+      - web
+      - redis
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key}
+      DEBUG: ${DEBUG:-True}
+      DATABASE_ENGINE: ${DATABASE_ENGINE:-django.db.backends.postgresql}
+      DATABASES_NAME: ${DATABASES_NAME:-youpayroll}
+      DATABASES_USER: ${DATABASES_USER:-postgres}
+      DATABASES_PASSWORD: ${DATABASES_PASSWORD:-postgres}
+      DATABASES_HOST: ${DATABASES_HOST:-db}
+      DATABASES_PORT: ${DATABASES_PORT:-5432}
+      AWS_S3_HOST: ${AWS_S3_HOST:-s3.amazonaws.com}
+      AWS_DEFAULT_ACL: ${AWS_DEFAULT_ACL:-private}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-dev}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-dev}
+      AWS_STORAGE_BUCKET_NAME: ${AWS_STORAGE_BUCKET_NAME:-dev-bucket}
+      AWS_CLOUDFRONT_DOMAIN: ${AWS_CLOUDFRONT_DOMAIN:-localhost}
+      AWS_S3_REGION_NAME: ${AWS_S3_REGION_NAME:-us-east-1}
+      AWS_QUERYSTRING_AUTH: ${AWS_QUERYSTRING_AUTH:-False}
+      AWS_S3_FILE_OVERWRITE: ${AWS_S3_FILE_OVERWRITE:-False}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}

@@ -1,0 +1,83 @@
+namespace: 'youpayroll'
+
+app_name: 'youpayroll'
+environment: 'production'
+
+service:
+  name: 'youpayroll-worker'
+  default:
+    port: 8000
+    protocol: 'TCP'
+    targetPort: 8000
+
+hpa:
+  name: 'youpayroll-worker-hpa'
+  minReplicas: 1
+  maxReplicas: 1
+  targetCPUUtilizationPercentage: 80
+
+pdb:
+  name: 'youpayroll-worker-pdb'
+  minAvailable: 50%
+
+deployment:
+  name: 'youpayroll-worker-deployment'
+  replicas: 1
+  maxSurge: 100%
+  maxUnavailable: 0%
+  serviceAccountName: 'ygag-youpayroll-vault'
+
+  containers:
+    default:
+      name: 'worker'
+      imagePullPolicy: 'Always'
+      image: '459037613883.dkr.ecr.me-central-1.amazonaws.com/production/ygg/youpayroll/backend-app:[BUILD_TAG]'
+      command: '["sh", "-c", "source /vault/secrets/application.env ; source /vault/secrets/application-devops.env ; sh /ygag/deployment/app/worker-entrypoint.sh"]'
+      env:
+        - name: 'DJANGO_SETTINGS_MODULE'
+          value: 'youpayroll.settings.production'
+      memory:
+        requests: 300Mi
+        limits: 400Mi
+      cpu:
+        requests: 150m
+      volumeMounts:
+        - mountPath: '/ygag/logs/'
+          name: 'ygag-youpayroll-production-worker-logs'
+        - name: 'youpayroll-app-env-volume'
+          mountPath: "/vault/secrets"
+
+
+  volumes:
+    - name: 'ygag-youpayroll-production-worker-logs'
+      hostPath:
+        path: '/home/ec2-user/ygag-logs/ygag-youpayroll-production/worker'
+    - name: 'youpayroll-app-env-volume'
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: "youpayroll-envs"
+
+  nodeSelector:
+    key: 'karpenter.sh/nodepool'
+    value: 'default'
+
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: 'topology.kubernetes.io/zone'
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app: 'youpayroll'
+          tier: worker
+    - maxSkew: 1
+      topologyKey: 'kubernetes.io/hostname'
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app: 'youpayroll'
+          tier: worker
+
+  priorityClassName: 'production-medium'
+  terminationGracePeriodSeconds: 60
