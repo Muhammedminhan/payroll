@@ -8,8 +8,10 @@ def validate_image(file):
     try:
         img = Image.open(file)
         img.verify()
-    except (IOError, SyntaxError) as e:
-        raise ValidationError("The uploaded file is not a valid image.")
+        # Reset file pointer after verify() as it consumes the stream
+        file.seek(0)
+    except (IOError, SyntaxError, Image.UnidentifiedImageError) as e:
+        raise ValidationError(f"The uploaded file is not a valid image: {e}")
 
 
 def user_directory_path(instance, filename):

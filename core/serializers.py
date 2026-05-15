@@ -14,6 +14,16 @@ class UserNotificationSerializer(serializers.ModelSerializer):
 class Base64ImageField(serializers.ImageField):
     def to_internal_value(self, data):
         if isinstance(data, str) and data.startswith('data:image'):
+            # Validate MIME type
+            allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
+            header_end = data.find(';')
+            if header_end == -1:
+                raise serializers.ValidationError("Invalid data URI format.")
+            
+            mime_type = data[5:header_end]
+            if mime_type not in allowed_types:
+                raise serializers.ValidationError(f"Unsupported image type: {mime_type}. Use JPG, PNG or GIF.")
+
             try:
                 header, imgstr = data.split(';base64,')
                 ext = header.split('/')[-1]
@@ -36,7 +46,11 @@ class ProfileSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Profile
-        fields = '__all__'
+        fields = [
+            'id', 'user', 'first_name', 'last_name', 'profile_picture',
+            'gender', 'dob', 'designation'
+        ]
+        read_only_fields = ['id', 'user']
 
     def update(self, instance, validated_data):
         # Extract name data
@@ -69,14 +83,26 @@ class ProfileSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 class PayslipSerializer(serializers.ModelSerializer):
-    consultant_id = serializers.CharField(source='user.profile.consultant_id', read_only=True)
-    account_number = serializers.CharField(source='user.profile.account_number', read_only=True)
-    ifsc_code = serializers.CharField(source='user.profile.ifsc_code', read_only=True)
-    branch_address = serializers.CharField(source='user.profile.branch_address', read_only=True)
-    
+    consultant_id = serializers.SerializerMethodField()
+    account_number = serializers.SerializerMethodField()
+    ifsc_code = serializers.SerializerMethodField()
+    branch_address = serializers.SerializerMethodField()
+
     class Meta:
         model = Payslip
         fields = '__all__'
+
+    def get_consultant_id(self, obj):
+        return getattr(obj.user.profile, 'consultant_id', '') if hasattr(obj.user, 'profile') else ''
+
+    def get_account_number(self, obj):
+        return getattr(obj.user.profile, 'account_number', '') if hasattr(obj.user, 'profile') else ''
+
+    def get_ifsc_code(self, obj):
+        return getattr(obj.user.profile, 'ifsc_code', '') if hasattr(obj.user, 'profile') else ''
+
+    def get_branch_address(self, obj):
+        return getattr(obj.user.profile, 'branch_address', '') if hasattr(obj.user, 'profile') else ''
 
 class DocumentSerializer(serializers.ModelSerializer):
     class Meta:

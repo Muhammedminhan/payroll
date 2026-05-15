@@ -50,10 +50,14 @@ class Command(BaseCommand):
         parser.add_argument("--grant-token", type=str, help="OAuth grant token (optional, can use ZOHO_GRANT_TOKEN env var)")
 
     def handle(self, *args, **options):
-        grant_token = options.get("grant_token") or os.environ.get("ZOHO_GRANT_TOKEN")
+        grant_token = options.get("grant_token")
         
         if not grant_token:
-            self.stdout.write(self.style.ERROR("Error: Grant token must be provided via --grant-token or ZOHO_GRANT_TOKEN env var."))
+            self.stdout.write("Please provide the Zoho OAuth Grant Token.")
+            grant_token = input("Grant Token: ").strip()
+        
+        if not grant_token:
+            self.stdout.write(self.style.ERROR("Error: Grant token is required."))
             return
             
         zoho_form_token_generation(grant_token, self.stdout, self.stderr, self.style)

@@ -1,10 +1,9 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import RightSidebar from '../components/RightSidebar';
 import TopHeader from '../components/TopHeader';
 import MobileBottomNav from '../components/MobileBottomNav';
-import { useLocation } from 'react-router-dom';
 
 const DashboardLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);

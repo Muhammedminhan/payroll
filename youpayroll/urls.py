@@ -21,7 +21,6 @@ from django.conf.urls.static import static
 from graphene_file_upload.django import FileUploadGraphQLView
 from django.views.decorators.csrf import csrf_exempt
 from youpayroll.schema import schema
-from core.decorators import login_required
 from .views import HealthCheck
 
 

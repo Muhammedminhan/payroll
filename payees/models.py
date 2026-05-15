@@ -66,26 +66,18 @@ class BankDetails(models.Model):
         verbose_name = _("Bank Detail")
         verbose_name_plural = _("Bank Details")
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._original_state = {
-            f.attname: getattr(self, f.attname) 
-            for f in self._meta.concrete_fields
-        }
 
     def save(self, *args, **kwargs):
         if self.pk:
+            # Robust tracking: read previous state from DB
+            previous = BankDetails.objects.get(pk=self.pk)
             tracked_fields = [
-                'payee_id', 'bank_name', 'account_no', 'account_holder_name',
+                'bank_name', 'account_no', 'account_holder_name',
                 'account_type', 'ifsc_code', 'micr_code', 'swift_code', 'branch_address'
             ]
-            if any(getattr(self, f) != self._original_state.get(f) for f in tracked_fields):
+            if any(getattr(self, f) != getattr(previous, f) for f in tracked_fields):
                 self.payee_acknowledgement = False
         super().save(*args, **kwargs)
-        self._original_state = {
-            f.attname: getattr(self, f.attname) 
-            for f in self._meta.concrete_fields
-        }
 
     def __str__(self):
         return self.account_holder_name or f"BankDetails {self.pk}"

@@ -36,19 +36,40 @@ def fetch_details(payee_id):
         response_data_list = {}
     
     if response_data_list:
-        # Find the first key that contains a list (the actual data)
-        fetched_data = None
-        for key, value in response_data_list.items():
-            if isinstance(value, list) and value:
-                fetched_data = value[0]
-                break
+        # Find the specific data key
+        fetched_data = response_data_list.get('Employee', [])
+        if isinstance(fetched_data, list) and fetched_data:
+            fetched_data = fetched_data[0]
+        else:
+            # Fallback heuristic if key changes
+            fetched_data = None
+            for key, value in response_data_list.items():
+                if isinstance(value, list) and value:
+                    fetched_data = value[0]
+                    break
         
         if fetched_data:
-            payee.full_name = f"{fetched_data.get('FirstName', '')} {fetched_data.get('LastName', '')}".strip()
-            payee.email = fetched_data.get("EmailID")
-            payee.pan_no = fetched_data.get("Pan_Number")
-            payee.address = fetched_data.get("Permanent_Address")
-            payee.date_of_joining = fetched_data.get("Dateofjoining")
+            # Only update if value is present in Zoho (don't overwrite with None)
+            full_name = f"{fetched_data.get('FirstName', '')} {fetched_data.get('LastName', '')}".strip()
+            if full_name:
+                payee.full_name = full_name
+            
+            email = fetched_data.get("EmailID")
+            if email:
+                payee.email = email
+                
+            pan = fetched_data.get("Pan_Number")
+            if pan:
+                payee.pan_no = pan
+                
+            addr = fetched_data.get("Permanent_Address")
+            if addr:
+                payee.address = addr
+                
+            doj = fetched_data.get("Dateofjoining")
+            if doj:
+                payee.date_of_joining = doj
+                
             payee.save()
         else:
             logger.warning(f"Could not find valid payee data list in Zoho response for {payee_id}")

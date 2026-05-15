@@ -23,11 +23,28 @@ export const NotificationProvider = ({ children }) => {
 
     // Initial fetch and polling
     useEffect(() => {
-        if (isAuthenticated) {
-            fetchNotifications();
-            const interval = setInterval(fetchNotifications, 30000); // Poll every 30s
-            return () => clearInterval(interval);
-        }
+        if (!isAuthenticated) return;
+
+        fetchNotifications();
+        
+        const interval = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                fetchNotifications();
+            }
+        }, 30000); // Poll every 30s only when tab is visible
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                fetchNotifications();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [fetchNotifications, isAuthenticated]);
 
     const markAsRead = async (notifId) => {

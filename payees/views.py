@@ -1,4 +1,4 @@
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, mixins
 from django.shortcuts import get_object_or_404
 from .models import Payee, BankDetails, BankDetailsAck
 from .serializers import PayeeSerializer, BankDetailSerializer, BankDetailAcknowledgementSerializer
@@ -13,7 +13,10 @@ class PayeeViewSet(viewsets.ReadOnlyModelViewSet):
             return Payee.objects.all()
         return Payee.objects.filter(user=self.request.user)
 
-class BankDetailViewSet(viewsets.ModelViewSet):
+class BankDetailViewSet(mixins.CreateModelMixin,
+                        mixins.ListModelMixin,
+                        mixins.RetrieveModelMixin,
+                        viewsets.GenericViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = BankDetailSerializer
     queryset = BankDetails.objects.all()

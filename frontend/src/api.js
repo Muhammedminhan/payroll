@@ -12,7 +12,8 @@ export const loginUser = async (email, password) => {
         body: JSON.stringify({ username: email, password: password })
     });
     if (!response.ok) {
-        throw new Error('Login failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.detail || 'Login failed');
     }
     return response.json();
 };
@@ -38,7 +39,10 @@ export const getProfile = async (token) => {
             'Authorization': `Token ${token}`
         }
     });
-    if (!response.ok) throw new Error('Failed to fetch profile');
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.detail || 'Failed to fetch profile');
+    }
     return response.json();
 };
 

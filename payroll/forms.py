@@ -30,7 +30,8 @@ class PayRunForm(forms.ModelForm):
 
         elif PayRun.objects.exists():
             # New record when prior PayRuns exist: auto-suggest next period
-            latest_payrun = PayRun.objects.latest('created_at')
+            # Order by year/month to find the chronologically latest run
+            latest_payrun = PayRun.objects.order_by('-year', '-month').first()
             next_month = latest_payrun.month + 1
             next_year = latest_payrun.year
 
@@ -56,3 +57,13 @@ class PayRunForm(forms.ModelForm):
             current_date = datetime.date.today()
             self.fields['month'].initial = current_date.month
             self.fields['year'].initial = current_date.year
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.instance.pk:
+            # Enforce immutability for month and year after creation
+            if cleaned_data.get('month') != self.instance.month:
+                self.add_error('month', "Month cannot be changed after creation.")
+            if cleaned_data.get('year') != self.instance.year:
+                self.add_error('year', "Year cannot be changed after creation.")
+        return cleaned_data

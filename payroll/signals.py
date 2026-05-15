@@ -14,7 +14,7 @@ def extract_zip_and_create_entries(sender, instance, created, **kwargs):
     to the corresponding payee by matching the PAN number.
     Dispatches to Celery to avoid blocking.
     """
-    if not instance.form16_zip_file or instance.is_extracted:
+    if not created or not instance.form16_zip_file or instance.is_extracted:
         return
         
     from payroll.tasks import extract_form16_zip_task
