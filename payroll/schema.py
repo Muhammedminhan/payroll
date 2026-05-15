@@ -5,11 +5,11 @@ from .models import Payment, PayRecordRegister
 
 
 class PayRecordRegisterType(DjangoObjectType):
+    """
+    This section displays the payee's bank information, along with the
+    salary and TDS percentage.
+    """
     class Meta:
-        """
-        This section displays the payee's bank information, along with the
-        salary and TDS percentage.
-        """
         model = PayRecordRegister
         fields = ('amount', 'bank_name', 'payee', 'account_number',
                   'account_holder_name', 'account_type', 'ifsc_code',
@@ -18,10 +18,10 @@ class PayRecordRegisterType(DjangoObjectType):
 
 
 class PaymentType(DjangoObjectType):
+    """
+    This section displays the salary amount of the employee
+    """
     class Meta:
-        """
-        This section displays the salary amount of the employee
-        """
         model = Payment
         fields = ('amount', 'label', 'payee')
 

@@ -25,7 +25,7 @@ class PayRunSerializer(serializers.ModelSerializer):
     class Meta:
         model = PayRun
         fields = ['id', 'month', 'year', 'status', 'created_at', 'error_log', 'payments']
-        read_only_fields = ['created_at', 'created_by', 'error_log']
+        read_only_fields = ['created_at', 'error_log']
 
 class PayRecordRegisterSerializer(serializers.ModelSerializer):
     class Meta:

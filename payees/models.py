@@ -32,8 +32,7 @@ class Payee(SafeDeleteModel):
     date_of_joining = models.CharField(max_length=50, null=True, blank=True)
     address = models.TextField(null=True, blank=True)
     is_dark_mode = models.BooleanField(default=False,
-                help_text="Enable dark mode for a darker, "
-                          "low-light-friendly interface ")
+                help_text="Enable dark mode for a low-light-friendly interface.")
 
     class Meta:
         verbose_name = _("Payee")
@@ -104,8 +103,7 @@ class BankDetailsAck(models.Model):
 
     is_approved = models.BooleanField(default=False)
     correction_comments = models.TextField(blank=True, null=True,
-                                           help_text="Please specify any "
-                                                     "mistaken areas found "
+                                           help_text="Specify any incorrect or mistaken fields "
                                                      "in the bank details.")
 
     class Meta:

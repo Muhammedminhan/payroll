@@ -9,7 +9,7 @@ from .models import Profile, Payslip, Document, AdminNotification, WikiCategory,
 class UserNotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserNotification
-        fields = '__all__'
+        fields = ['id', 'user', 'title', 'message', 'notification_type', 'is_read', 'created_at']
 
 class Base64ImageField(serializers.ImageField):
     def to_internal_value(self, data):
@@ -29,8 +29,8 @@ class Base64ImageField(serializers.ImageField):
                 ext = header.split('/')[-1]
                 file_name = f"{uuid.uuid4().hex[:10]}.{ext}"
                 data = ContentFile(base64.b64decode(imgstr), name=file_name)
-            except (ValueError, binascii.Error) as e:
-                raise serializers.ValidationError(f"Invalid image format: {e}")
+            except (ValueError, binascii.Error):
+                raise serializers.ValidationError("Invalid image format. Please ensure the base64 string is valid.")
         return super().to_internal_value(data)
 
 class UserSerializer(serializers.ModelSerializer):
@@ -90,13 +90,20 @@ class PayslipSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Payslip
-        fields = '__all__'
+        fields = [
+            'id', 'user', 'month', 'year', 'gross_pay', 'reimbursement',
+            'deductions', 'take_home', 'file', 'tax_worksheet', 'created_at',
+            'consultant_id', 'account_number', 'ifsc_code', 'branch_address'
+        ]
 
     def get_consultant_id(self, obj):
         return getattr(obj.user.profile, 'consultant_id', '') if hasattr(obj.user, 'profile') else ''
 
     def get_account_number(self, obj):
-        return getattr(obj.user.profile, 'account_number', '') if hasattr(obj.user, 'profile') else ''
+        acc = getattr(obj.user.profile, 'account_number', '') if hasattr(obj.user, 'profile') else ''
+        if acc and len(acc) > 4:
+            return f"{'*' * (len(acc) - 4)}{acc[-4:]}"
+        return acc
 
     def get_ifsc_code(self, obj):
         return getattr(obj.user.profile, 'ifsc_code', '') if hasattr(obj.user, 'profile') else ''
@@ -107,18 +114,18 @@ class PayslipSerializer(serializers.ModelSerializer):
 class DocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
-        fields = '__all__'
+        fields = ['id', 'user', 'title', 'description', 'status', 'file', 'admin_feedback', 'updated_at']
         read_only_fields = ['user', 'status', 'admin_feedback', 'updated_at']
 
 class AdminNotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = AdminNotification
-        fields = '__all__'
+        fields = ['id', 'title', 'message', 'is_active', 'created_at']
 
 class WikiCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = WikiCategory
-        fields = '__all__'
+        fields = ['id', 'name', 'slug', 'description', 'created_at']
 
 class WikiPageSerializer(serializers.ModelSerializer):
     author_name = serializers.CharField(source='author.get_full_name', read_only=True)
@@ -126,5 +133,8 @@ class WikiPageSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = WikiPage
-        fields = '__all__'
+        fields = [
+            'id', 'title', 'slug', 'content', 'category', 'category_name',
+            'author', 'author_name', 'created_at', 'updated_at'
+        ]
         read_only_fields = ['author', 'slug']

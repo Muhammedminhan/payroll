@@ -10,7 +10,7 @@ const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
                 <div className="modal-header">
                     <h2>Logout!</h2>
                 </div>
-                <p className="modal-body">Are you sure, you want to log out from YOUPayroll?</p>
+                <p className="modal-body">Are you sure you want to log out of YOUPayroll?</p>
 
                 <div className="modal-actions">
                     <button onClick={onClose} className="cancel-btn">Cancel</button>

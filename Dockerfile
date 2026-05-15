@@ -17,14 +17,13 @@ COPY requirements.txt /youpayroll/
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# Create a non-root user and set permissions
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-RUN chown -R appuser:appgroup /youpayroll
-
 COPY . /youpayroll/
 RUN chmod +x /youpayroll/entrypoint.sh
 
-USER appuser
+# Create a non-root user and set permissions (after COPY)
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN chown -R appuser:appgroup /youpayroll
 
+USER appuser
 ENTRYPOINT ["/youpayroll/entrypoint.sh"]
 

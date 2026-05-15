@@ -2,6 +2,8 @@ from rest_framework import serializers
 from .models import Payee, BankDetails, BankDetailsAck
 
 class BankDetailSerializer(serializers.ModelSerializer):
+    account_no = serializers.SerializerMethodField()
+
     class Meta:
         model = BankDetails
         fields = [
@@ -10,6 +12,13 @@ class BankDetailSerializer(serializers.ModelSerializer):
             'branch_address', 'payee_acknowledgement'
         ]
         read_only_fields = ['payee', 'payee_acknowledgement']
+
+    def get_account_no(self, obj):
+        # Mask account number: only show last 4 digits
+        acc = obj.account_no
+        if acc and len(acc) > 4:
+            return f"{'*' * (len(acc) - 4)}{acc[-4:]}"
+        return acc
 
 class PayeeSerializer(serializers.ModelSerializer):
     bank_details = BankDetailSerializer(source='bankdetails_set', many=True, read_only=True)

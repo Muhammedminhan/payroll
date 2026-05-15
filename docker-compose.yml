@@ -48,8 +48,6 @@ services:
   celery:
     build: .
     command: celery -A youpayroll worker -l info -B
-    # Overwrite entrypoint for celery to skip migrations/collectstatic
-    entrypoint: ["celery", "-A", "youpayroll", "worker", "-l", "info", "-B"]
     volumes:
       - .:/youpayroll
     depends_on:

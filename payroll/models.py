@@ -55,8 +55,8 @@ class PayRun(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE,
                                    editable=False, null=True, blank=True)
     error_log = models.TextField(blank=True, null=True,
-                                 help_text="shows only if any error occur "
-                                           "in payees data ")
+                                 help_text="Shows only if any errors occur "
+                                           "in payees data.")
 
     class Meta:
         verbose_name = _("Pay Run")

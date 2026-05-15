@@ -37,8 +37,8 @@ def zoho_form_token_generation(grant_token, stdout, stderr, style):
         else:
             stderr.write(style.ERROR(f"Error: Response missing tokens. Response: {tgeneration_resp_val}"))
     else:
-        status = tgeneration_resp.status_code if tgeneration_resp else "No Response"
-        body = tgeneration_resp.text if tgeneration_resp else ""
+        status = tgeneration_resp.status_code if tgeneration_resp else "Network Error"
+        body = tgeneration_resp.text if tgeneration_resp else "Check logs for detailed network error"
         stderr.write(style.ERROR(f"Error: Token generation failed. Status: {status}, Body: {body}"))
 
 
