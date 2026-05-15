@@ -1,6 +1,6 @@
 RESTRICTED_PAYEE_GROUP = ['PAYEE']
 
-YGG_EMAIL = "yougotagift.com"
+YGG_EMAIL_DOMAIN = "yougotagift.com"
 
 JANUARY = 1
 FEBRUARY = 2

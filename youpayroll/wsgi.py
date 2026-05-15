@@ -1,15 +1,7 @@
-"""
-WSGI config for youpayroll project.
-
-It exposes the WSGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/4.2/howto/deployment/wsgi/
-"""
-
 import os
-
 from django.core.wsgi import get_wsgi_application
 
-# No default settings; must be provided via DJANGO_SETTINGS_MODULE env var.
+# Set development as default for local runs, but warn in production
+# Most production environments (Helm, Docker) will explicitly override this.
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'youpayroll.settings.development')
 application = get_wsgi_application()

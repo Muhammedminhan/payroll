@@ -21,10 +21,11 @@ class PaymentSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
 class PayRunSerializer(serializers.ModelSerializer):
-    payments = PaymentSerializer(many=True, read_only=True)
+    # Fixed: source='payrecordregister_set' is used as the link to related records
+    records = serializers.PrimaryKeyRelatedField(source='payrecordregister_set', many=True, read_only=True)
     class Meta:
         model = PayRun
-        fields = ['id', 'month', 'year', 'status', 'created_at', 'error_log', 'payments']
+        fields = ['id', 'month', 'year', 'status', 'created_at', 'error_log', 'records']
         read_only_fields = ['created_at', 'error_log']
 
 class PayRecordRegisterSerializer(serializers.ModelSerializer):
@@ -36,4 +37,4 @@ class PayRecordRegisterSerializer(serializers.ModelSerializer):
             'account_type', 'ifsc_code', 'micr_code', 'swift_code',
             'branch_address', 'tds_percentage', 'gross_amount', 'net_income'
         ]
-        read_only_fields = fields # All fields are read-only for history
+        read_only_fields = fields 

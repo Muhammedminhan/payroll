@@ -1,19 +1,24 @@
 import logging
 from celery import shared_task
+from django.core.exceptions import ObjectDoesNotExist
 from .models import Payee
 from zohopeople.utils import get_payees_details
 
-# For getting the named logger
+# For getting the named logger configured in settings.py
 logger = logging.getLogger('celery_debug')
-
 
 # To fetch payee details from zoho people
 @shared_task
 def fetch_details(payee_id):
     try:
-        payee = Payee.objects.get(hrm_id=payee_id)
-    except Payee.DoesNotExist:
-        logger.error(f"Payee with HRM ID {payee_id} not found locally. Skipping Zoho call.")
+        # Use filter().first() to handle multiple-record edge cases gracefully
+        # though HRM ID should ideally be unique.
+        payee = Payee.objects.filter(hrm_id=payee_id).first()
+        if not payee:
+            logger.error(f"Payee with HRM ID {payee_id} not found locally. Skipping Zoho call.")
+            return
+    except Exception as e:
+        logger.error(f"Error looking up payee {payee_id}: {e}")
         return
 
     try:
@@ -27,13 +32,17 @@ def fetch_details(payee_id):
                 response_data_list = result_list[0]
             else:
                 logger.warning(f"No result found in Zoho for payee {payee_id}")
-                response_data_list = {}
+                return
         else:
-            logger.warning(f"Zoho API returned status {response.status_code if response else 'None'} for {payee_id}")
-            response_data_list = {}
+            status = response.status_code if response else 'None'
+            logger.warning(f"Zoho API returned status {status} for {payee_id}")
+            return
+    except (ValueError, KeyError) as e:
+        logger.error(f"Data parsing error in fetch_details for {payee_id}: {e}")
+        return
     except Exception as e:
-        logger.error(f"Error in fetch_details for {payee_id}: {e}")
-        response_data_list = {}
+        logger.error(f"Unexpected error in fetch_details for {payee_id}: {e}")
+        return
     
     if response_data_list:
         # Find the specific data key

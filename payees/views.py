@@ -25,11 +25,17 @@ class BankDetailViewSet(mixins.CreateModelMixin,
         return BankDetails.objects.filter(payee__user=self.request.user)
 
     def perform_create(self, serializer):
-        # Enforce that bank details are always created for the authenticated user's payee record
         payee = get_object_or_404(Payee, user=self.request.user)
         serializer.save(payee=payee)
 
-class BankDetailAcknowledgementViewSet(viewsets.ModelViewSet):
+class BankDetailAcknowledgementViewSet(mixins.CreateModelMixin,
+                                       mixins.ListModelMixin,
+                                       mixins.RetrieveModelMixin,
+                                       viewsets.GenericViewSet):
+    """
+    Acknowledgements are immutable user-attestations.
+    Exposing only Create, List, and Retrieve.
+    """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = BankDetailAcknowledgementSerializer
     queryset = BankDetailsAck.objects.all()
@@ -38,6 +44,5 @@ class BankDetailAcknowledgementViewSet(viewsets.ModelViewSet):
         return BankDetailsAck.objects.filter(payee__user=self.request.user)
 
     def perform_create(self, serializer):
-        # Enforce that acknowledgements are always created for the authenticated user's payee record
         payee = get_object_or_404(Payee, user=self.request.user)
         serializer.save(payee=payee)

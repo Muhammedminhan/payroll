@@ -6,15 +6,26 @@ import App from './App.jsx'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
+const RootComponent = () => {
+  if (!GOOGLE_CLIENT_ID) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: 'red', fontFamily: 'sans-serif' }}>
+        <h1>Configuration Error</h1>
+        <p>VITE_GOOGLE_CLIENT_ID is missing in environment.</p>
+        <p style={{ color: '#666', fontSize: '0.9rem' }}>Please check your .env files or deployment secrets.</p>
+      </div>
+    );
+  }
+
+  return (
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <App />
+    </GoogleOAuthProvider>
+  );
+};
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID || 'missing-client-id'}>
-      {GOOGLE_CLIENT_ID ? <App /> : (
-        <div style={{ padding: '2rem', textAlign: 'center', color: 'red' }}>
-          <h1>Configuration Error</h1>
-          <p>VITE_GOOGLE_CLIENT_ID is missing in environment.</p>
-        </div>
-      )}
-    </GoogleOAuthProvider>
+    <RootComponent />
   </StrictMode>,
 )
