@@ -12,11 +12,14 @@ def zoho_form_token_generation(grant_token, stdout, stderr, style):
     and Refresh token to generate new Access token. Store both
     tokens in DB.
     """
+    # Prefer redirect URI from env if registered specifically for this client
+    redirect_uri = config('ZOHOPEOPLE_REDIRECT_URI', default=ZP_API_REDIR_URI)
+
     tgeneration_data = {
         'grant_type': GRANT_TYPE,
         'client_id': config('ZOHOPEOPLE_CLIENT_ID'),
         'client_secret': config('ZOHOPEOPLE_CLIENT_SECRET'),
-        'redirect_uri': ZP_API_REDIR_URI,
+        'redirect_uri': redirect_uri,
         'code': grant_token
     }
 
@@ -35,11 +38,10 @@ def zoho_form_token_generation(grant_token, stdout, stderr, style):
             tokens.save()
             stdout.write(style.SUCCESS("Tokens generated and stored successfully."))
         else:
-            stderr.write(style.ERROR(f"Error: Response missing tokens. Response: {tgeneration_resp_val}"))
+            stderr.write(style.ERROR(f"Error: Response missing tokens."))
     else:
         status = tgeneration_resp.status_code if tgeneration_resp else "Network Error"
-        body = tgeneration_resp.text if tgeneration_resp else "Check logs for detailed network error"
-        stderr.write(style.ERROR(f"Error: Token generation failed. Status: {status}, Body: {body}"))
+        stderr.write(style.ERROR(f"Error: Token generation failed. Status: {status}"))
 
 
 class Command(BaseCommand):
@@ -52,11 +54,7 @@ class Command(BaseCommand):
         grant_token = options.get("grant_token")
         
         if not grant_token:
-            self.stdout.write("Please provide the Zoho OAuth Grant Token.")
-            grant_token = input("Grant Token: ").strip()
-        
-        if not grant_token:
-            self.stdout.write(self.style.ERROR("Error: Grant token is required."))
+            self.stderr.write(self.style.ERROR("Error: Grant token is required. Use --grant-token <token>"))
             return
             
         zoho_form_token_generation(grant_token, self.stdout, self.stderr, self.style)

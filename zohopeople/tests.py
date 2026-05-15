@@ -1,4 +1,5 @@
 from unittest.mock import patch, MagicMock
+from django.utils import timezone
 from zohopeople.utils import generate_access_token, get_payees_details
 from zohopeople.models import ZohoPeopleFormToken
 from django.test import TestCase
@@ -24,19 +25,17 @@ class ZohoUtilsTest(TestCase):
         self.assertEqual(token_obj.access_token, "new_access")
 
     def test_generate_access_token_multi_row_ordering(self):
-        # Create an older row with a refresh token and a newer row WITHOUT a refresh token
-        # The code should pick the row with the refresh token regardless of 'created' timestamp
-        # if filter(refresh_token__isnull=False) is used.
+        # Create two rows with refresh tokens, one older and one newer
         ZohoPeopleFormToken.objects.all().delete()
         
-        target = ZohoPeopleFormToken.objects.create(
-            access_token="target_access",
-            refresh_token="target_refresh"
+        old_row = ZohoPeopleFormToken.objects.create(
+            access_token="old_access",
+            refresh_token="old_refresh"
         )
-        # Newer row but no refresh token
-        ZohoPeopleFormToken.objects.create(
-            access_token="newest_access",
-            refresh_token=None
+        # Ensure 'created' is different
+        new_row = ZohoPeopleFormToken.objects.create(
+            access_token="new_access",
+            refresh_token="new_refresh"
         )
 
         with patch('zohopeople.utils.requests.post') as mock_post:
@@ -45,8 +44,13 @@ class ZohoUtilsTest(TestCase):
             
             generate_access_token()
             
-            target.refresh_from_db()
-            self.assertEqual(target.access_token, "updated_access")
+            # The newest row (new_row) should have been the one targeted/updated
+            new_row.refresh_from_db()
+            self.assertEqual(new_row.access_token, "updated_access")
+            
+            # The old row should remain unchanged
+            old_row.refresh_from_db()
+            self.assertEqual(old_row.access_token, "old_access")
 
     @patch('zohopeople.utils.requests.post')
     def test_generate_access_token_failure(self, mock_post):
@@ -63,11 +67,6 @@ class ZohoUtilsTest(TestCase):
 
     @patch('zohopeople.utils.requests.post')
     def test_get_payees_details_retry_on_401(self, mock_post):
-        # Sequence: 
-        # 1. First call returns 401
-        # 2. generate_access_token calls requests.post (returns 200)
-        # 3. Recursive call returns 200
-        
         mock_401 = MagicMock()
         mock_401.status_code = 401
         
@@ -84,5 +83,4 @@ class ZohoUtilsTest(TestCase):
         response = get_payees_details("HRM123")
         
         self.assertEqual(response.status_code, 200)
-        # Verify 3 calls: 1st data attempt (401), token refresh, 2nd data attempt
         self.assertEqual(mock_post.call_count, 3)

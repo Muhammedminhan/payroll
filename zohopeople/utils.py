@@ -4,7 +4,7 @@ import requests
 from decouple import config
 from requests.exceptions import RequestException
 from .models import ZohoPeopleFormToken
-from .constants import ZP_EMPLOYEE_DETAILS_API, ZP_API_ATOKEN_DOM_URL
+from .constants import ZP_EMPLOYEE_DETAILS_API, ZP_API_ATOKEN_DOM_URL, NEW_GRANT_TYPE
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ def call_token_generation_api(url, data):
             logger.info("Token generation is successful")
             return response
         else:
-            logger.warning(f"Token generation failed. Status: {response.status_code}, Body: {response.text}")
+            logger.warning(f"Token generation failed. Status: {response.status_code}")
             return None
     except RequestException as err:
         logger.error(f"Network error in token generation API at {url}: {err}")
@@ -33,7 +33,7 @@ def generate_access_token():
     generate using custom commands
     """
     # Get the latest valid refresh token
-    token_obj = ZohoPeopleFormToken.objects.filter(refresh_token__isnull=False).first()
+    token_obj = ZohoPeopleFormToken.objects.filter(refresh_token__isnull=False).order_by('-created').first()
     if not token_obj:
         logger.error("No refresh token found in database.")
         return None
@@ -43,16 +43,19 @@ def generate_access_token():
         "refresh_token": refresh_token,
         "client_id": config("ZOHOPEOPLE_CLIENT_ID"),
         "client_secret": config("ZOHOPEOPLE_CLIENT_SECRET"),
-        "grant_type": "refresh_token"
+        "grant_type": NEW_GRANT_TYPE
     }
     try:
         response = requests.post(url=url, data=data, timeout=30)
         if response.status_code == 200:
             token_obj.access_token = response.json().get("access_token")
-            token_obj.save(update_fields=['access_token'])
+            # Also update the 'created' timestamp to ensure this row remains 'latest'
+            from django.utils import timezone
+            token_obj.created = timezone.now()
+            token_obj.save(update_fields=['access_token', 'created'])
             return response
         else:
-            logger.warning(f"Failed to generate access token. Status: {response.status_code}, Body: {response.text}")
+            logger.warning(f"Failed to generate access token. Status: {response.status_code}")
             return None
     except RequestException as e:
         logger.error(f"Network error during access token generation: {e}")
@@ -64,15 +67,12 @@ def get_emp_access_token():
     """Fetch Access token from the DB and return the latest Access
     token.
     """
-    try:
-        # Filter by presence of token and be explicit about ordering
-        latest_token_obj = ZohoPeopleFormToken.objects.filter(access_token__isnull=False).order_by('-created').first()
-        if not latest_token_obj:
-            return None
-        return latest_token_obj.access_token
-    except ZohoPeopleFormToken.DoesNotExist:
-        logger.error("No ZohoPeopleFormToken found in database.")
+    # Filter by presence of token and be explicit about ordering
+    latest_token_obj = ZohoPeopleFormToken.objects.filter(access_token__isnull=False).order_by('-created').first()
+    if not latest_token_obj:
+        logger.error("No ZohoPeopleFormToken with access_token found in database.")
         return None
+    return latest_token_obj.access_token
 
 
 # Function to call zoho people API to get the details of payees
@@ -106,6 +106,7 @@ def get_payees_details(emp_id, retry=True):
         elif response.status_code == 401 and retry:
             gen_resp = generate_access_token()
             if gen_resp and gen_resp.status_code == 200:
+                # Recurse: next call will use the newly generated token
                 return get_payees_details(emp_id, retry=False)
             else:
                 logger.error("Failed to refresh token during 401 retry.")
@@ -113,7 +114,7 @@ def get_payees_details(emp_id, retry=True):
                 return response
 
         else:
-            logger.warning(f"Zoho API error for emp_id {emp_id}. Status: {response.status_code}, Body: {response.text}")
+            logger.warning(f"Zoho API error for emp_id {emp_id}. Status: {response.status_code}")
             return response
     except RequestException as e:
         logger.error(f"Network error calling Zoho API for emp_id {emp_id}: {e}")

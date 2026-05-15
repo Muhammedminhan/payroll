@@ -11,5 +11,5 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'youpayroll.settings.development')
+# No default settings; must be provided via DJANGO_SETTINGS_MODULE env var.
 application = get_wsgi_application()

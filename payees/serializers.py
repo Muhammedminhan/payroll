@@ -14,11 +14,11 @@ class BankDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ['payee', 'payee_acknowledgement']
 
     def get_account_no(self, obj):
-        # Mask account number: only show last 4 digits
-        acc = obj.account_no
-        if acc and len(acc) > 4:
-            return f"{'*' * (len(acc) - 4)}{acc[-4:]}"
-        return acc
+        # Unconditionally mask account number
+        acc = obj.account_no or ""
+        if len(acc) <= 4:
+            return "****"
+        return f"{'*' * (len(acc) - 4)}{acc[-4:]}"
 
 class PayeeSerializer(serializers.ModelSerializer):
     pan_no = serializers.SerializerMethodField()
@@ -33,11 +33,11 @@ class PayeeSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'hrm_id', 'status']
 
     def get_pan_no(self, obj):
-        # Mask PAN: show only last 4 chars
-        pan = obj.pan_no
-        if pan and len(pan) > 4:
-            return f"{'*' * (len(pan) - 4)}{pan[-4:]}"
-        return pan
+        # Unconditionally mask PAN
+        pan = obj.pan_no or ""
+        if len(pan) <= 4:
+            return "****"
+        return f"{'*' * (len(pan) - 4)}{pan[-4:]}"
 
 class BankDetailAcknowledgementSerializer(serializers.ModelSerializer):
     class Meta:

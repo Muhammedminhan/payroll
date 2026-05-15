@@ -1,6 +1,7 @@
 from .base import *
-from django.core.exceptions import ImproperlyConfigured
-from decouple import config
+
+# Enforce production mode
+DEBUG = False
 
 # Enforce GOOGLE_CLIENT_ID in production when DEBUG is False
 if not DEBUG and not GOOGLE_CLIENT_ID:

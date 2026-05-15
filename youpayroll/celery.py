@@ -3,7 +3,7 @@ from celery import Celery
 
 import os
 # set the default Django settings module for the 'celery' program.
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'youpayroll.settings.development')
+# No default settings; must be provided via DJANGO_SETTINGS_MODULE env var.
 
 # For creating a new Celery application instance with the project name.
 app = Celery('youpayroll')

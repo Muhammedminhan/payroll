@@ -20,12 +20,13 @@ from django.conf import settings
 from django.conf.urls.static import static
 from graphene_file_upload.django import FileUploadGraphQLView
 from youpayroll.schema import schema
-from .views import HealthCheck
+from .views import LivenessCheck, ReadinessCheck
 
 
 urlpatterns = [
     path('vinton-gray-cerf/', admin.site.urls),
-    path('health/', HealthCheck.as_view(), name='health'),
+    path('health/live', LivenessCheck.as_view(), name='liveness_check'),
+    path('health/ready', ReadinessCheck.as_view(), name='readiness_check'),
     path('graphql/', FileUploadGraphQLView.as_view(graphiql=settings.DEBUG,
                                                                schema=schema)),
     path('accounts/', include('allauth.urls')),

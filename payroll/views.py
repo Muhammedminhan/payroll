@@ -31,10 +31,6 @@ class Form16ViewSet(viewsets.ModelViewSet):
     serializer_class = Form16Serializer
     queryset = Form16.objects.all()
 
-    def perform_create(self, serializer):
-        # Assuming Form16 model might need created_by as well for consistency
-        serializer.save()
-
 class Form16EntryViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = Form16EntrySerializer
