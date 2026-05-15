@@ -1,8 +1,8 @@
 import os
 from celery import Celery
 
-# Set development as default for local runs
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'youpayroll.settings.development')
+# Safer default for Celery entrypoint
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'youpayroll.settings.production')
 
 app = Celery('youpayroll')
 app.config_from_object('django.conf:settings', namespace='CELERY')

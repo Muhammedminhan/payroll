@@ -12,13 +12,14 @@ logger = logging.getLogger(__name__)
 
 
 def call_token_generation_api(url, data):
-    """ Generate tokens"""
+    """ Generate tokens """
     try:
         response = requests.post(url=url, data=data, timeout=30)
         if response.status_code == 200:
             logger.info("Token generation is successful")
             return response
         else:
+            # We log the status code. Callers are responsible for error body redaction if logged.
             logger.warning(f"Token generation failed. Status: {response.status_code}")
             return None
     except RequestException as err:
@@ -29,49 +30,62 @@ def call_token_generation_api(url, data):
 def generate_access_token():
     """
     Calls the zoho people API to generate access token using refresh token.
-    Uses select_for_update to handle concurrent refresh attempts.
+    Uses a lightweight check before entering a blocking network call inside a transaction.
     """
     url = ZP_API_ATOKEN_DOM_URL
     
-    with transaction.atomic():
-        # Lock the row to prevent concurrent refresh thundering herd
-        token_obj = ZohoPeopleFormToken.objects.select_for_update().filter(
-            refresh_token__isnull=False
-        ).order_by('-created').first()
+    # 1. Quick check: Is a valid token already available?
+    # Using last_refreshed_at for accurate tracking
+    token_obj = ZohoPeopleFormToken.objects.filter(
+        refresh_token__isnull=False
+    ).order_by('-created').first()
 
-        if not token_obj:
-            logger.error("No refresh token found in database.")
-            return None
-            
-        # Check if another process refreshed it while we were waiting for the lock
-        # (A simple 5-minute buffer check)
-        if token_obj.access_token and (timezone.now() - token_obj.created).total_seconds() < 300:
-            logger.info("Token was recently refreshed by another worker. Skipping refresh.")
-            # Return a fake response object to satisfy the caller's check for .status_code == 200
+    if not token_obj:
+        logger.error("No refresh token found in database.")
+        return None
+
+    if token_obj.access_token and token_obj.last_refreshed_at:
+        if (timezone.now() - token_obj.last_refreshed_at).total_seconds() < 300:
+            logger.info("Token was recently refreshed. Skipping network call.")
             resp = requests.Response()
             resp.status_code = 200
+            resp._content = b'{"status": "cached"}' # Prevent json decode error if caller expects body
             return resp
 
-        data = {
-            "refresh_token": token_obj.refresh_token,
-            "client_id": config("ZOHOPEOPLE_CLIENT_ID"),
-            "client_secret": config("ZOHOPEOPLE_CLIENT_SECRET"),
-            "grant_type": NEW_GRANT_TYPE
-        }
-        
-        try:
-            response = requests.post(url=url, data=data, timeout=30)
-            if response.status_code == 200:
-                token_obj.access_token = response.json().get("access_token")
-                token_obj.created = timezone.now()
-                token_obj.save(update_fields=['access_token', 'created'])
-                return response
-            else:
-                logger.warning(f"Failed to generate access token. Status: {response.status_code}")
+    # 2. Network call outside the main row lock to avoid blocking other workers for 30s
+    refresh_token = token_obj.refresh_token
+    data = {
+        "refresh_token": refresh_token,
+        "client_id": config("ZOHOPEOPLE_CLIENT_ID"),
+        "client_secret": config("ZOHOPEOPLE_CLIENT_SECRET"),
+        "grant_type": NEW_GRANT_TYPE
+    }
+
+    try:
+        response = requests.post(url=url, data=data, timeout=30)
+        if response.status_code == 200:
+            resp_data = response.json()
+            access_token = resp_data.get("access_token")
+            
+            if not access_token:
+                logger.error(f"Zoho returned 200 but no access_token in body. Response: {resp_data.get('error', 'unknown error')}")
                 return None
-        except RequestException as e:
-            logger.error(f"Network error during access token generation: {e}")
+
+            # 3. Use transaction and select_for_update only for the final atomic write
+            with transaction.atomic():
+                # Re-fetch with lock
+                locked_token = ZohoPeopleFormToken.objects.select_for_update().get(pk=token_obj.pk)
+                locked_token.access_token = access_token
+                locked_token.last_refreshed_at = timezone.now()
+                locked_token.save(update_fields=['access_token', 'last_refreshed_at'])
+            
+            return response
+        else:
+            logger.warning(f"Failed to generate access token. Status: {response.status_code}")
             return None
+    except RequestException as e:
+        logger.error(f"Network error during access token generation: {e}")
+        return None
 
 
 def get_emp_access_token():
@@ -79,7 +93,6 @@ def get_emp_access_token():
     # Optimization: Use .only and remove null check (field is non-nullable)
     latest_token_obj = ZohoPeopleFormToken.objects.order_by('-created').only('access_token').first()
     if not latest_token_obj:
-        logger.error("No ZohoPeopleFormToken found in database.")
         return None
     return latest_token_obj.access_token
 
@@ -105,9 +118,13 @@ def get_payees_details(emp_id, retry=True):
         elif response.status_code == 401 and retry:
             gen_resp = generate_access_token()
             if gen_resp and gen_resp.status_code == 200:
+                # Recurse: next call will use the newly generated token
                 return get_payees_details(emp_id, retry=False)
             logger.error("Failed to refresh token during 401 retry.")
-            return None # Return None on failure instead of raw 401
+            return None
+        elif response.status_code == 401 and not retry:
+            logger.error(f"Zoho API returned 401 even after token refresh for emp_id {emp_id}.")
+            return None
         else:
             logger.warning(f"Zoho API error for emp_id {emp_id}. Status: {response.status_code}")
             return None
