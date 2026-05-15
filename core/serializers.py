@@ -1,3 +1,7 @@
+import base64
+import binascii
+import uuid
+from django.core.files.base import ContentFile
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Profile, Payslip, Document, AdminNotification, WikiCategory, WikiPage, UserNotification
@@ -10,17 +14,13 @@ class UserNotificationSerializer(serializers.ModelSerializer):
 class Base64ImageField(serializers.ImageField):
     def to_internal_value(self, data):
         if isinstance(data, str) and data.startswith('data:image'):
-            import base64
-            import uuid
-            from django.core.files.base import ContentFile
-            # Decode the base64 string
             try:
-                format, imgstr = data.split(';base64,')
-                ext = format.split('/')[-1]
+                header, imgstr = data.split(';base64,')
+                ext = header.split('/')[-1]
                 file_name = f"{uuid.uuid4().hex[:10]}.{ext}"
                 data = ContentFile(base64.b64decode(imgstr), name=file_name)
-            except Exception:
-                raise serializers.ValidationError("Invalid image format")
+            except (ValueError, binascii.Error) as e:
+                raise serializers.ValidationError(f"Invalid image format: {e}")
         return super().to_internal_value(data)
 
 class UserSerializer(serializers.ModelSerializer):
@@ -72,7 +72,7 @@ class PayslipSerializer(serializers.ModelSerializer):
     consultant_id = serializers.CharField(source='user.profile.consultant_id', read_only=True)
     account_number = serializers.CharField(source='user.profile.account_number', read_only=True)
     ifsc_code = serializers.CharField(source='user.profile.ifsc_code', read_only=True)
-    bank_name = serializers.CharField(source='user.profile.branch_address', read_only=True) # Using branch_address as proxy for bank info if needed
+    branch_address = serializers.CharField(source='user.profile.branch_address', read_only=True)
     
     class Meta:
         model = Payslip
