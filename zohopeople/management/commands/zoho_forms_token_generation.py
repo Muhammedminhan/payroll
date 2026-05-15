@@ -1,5 +1,4 @@
 import os
-import sys
 from decouple import config
 from django.core.management.base import BaseCommand
 from zohopeople.constants import (GRANT_TYPE, ZP_API_REDIR_URI,

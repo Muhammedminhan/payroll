@@ -10,7 +10,8 @@ RUN apk add --no-cache \
     postgresql-dev \
     libjpeg-turbo-dev \
     zlib-dev \
-    libffi-dev
+    libffi-dev \
+    netcat-openbsd
 
 COPY requirements.txt /youpayroll/
 RUN pip install --upgrade pip

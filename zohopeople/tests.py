@@ -1,4 +1,3 @@
-import unittest
 from unittest.mock import patch, MagicMock
 from zohopeople.utils import generate_access_token, get_payees_details
 from zohopeople.models import ZohoPeopleFormToken
@@ -11,7 +10,7 @@ class ZohoUtilsTest(TestCase):
             refresh_token="valid_refresh"
         )
 
-    @patch('requests.post')
+    @patch('zohopeople.utils.requests.post')
     def test_generate_access_token_success(self, mock_post):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -24,7 +23,7 @@ class ZohoUtilsTest(TestCase):
         token_obj = ZohoPeopleFormToken.objects.latest('created')
         self.assertEqual(token_obj.access_token, "new_access")
 
-    @patch('requests.post')
+    @patch('zohopeople.utils.requests.post')
     def test_get_payees_details_retry_on_401(self, mock_post):
         # Sequence: 
         # 1. First call returns 401

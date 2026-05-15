@@ -7,7 +7,7 @@ echo "$DATABASE"
 if [ "$DATABASE" = "postgres" ]; then
     echo "Waiting for postgres..."
 
-    # Loop until PostgreSQL is ready to accept connections
+    # Loop until PostgreSQL is ready to accept connections (using nc -z from netcat-openbsd)
     while ! nc -z "$DATABASES_HOST" "$DATABASES_PORT"; do
       sleep 0.1
     done

@@ -1,13 +1,8 @@
-import os
-import zipfile
 import logging
-from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
 from django.dispatch import receiver
 from django.db import transaction
 from django.db.models.signals import post_save
-from .models import Form16, Form16Entries
-from payees.models import Payee
+from .models import Form16
 
 logger = logging.getLogger(__name__)
 

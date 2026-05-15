@@ -2,9 +2,6 @@ import logging
 import json
 import requests
 from decouple import config
-from requests.exceptions import HTTPError
-from requests.exceptions import ConnectionError
-from requests.exceptions import Timeout
 from requests.exceptions import RequestException
 from .models import ZohoPeopleFormToken
 from .constants import ZP_EMPLOYEE_DETAILS_API, ZP_API_ATOKEN_DOM_URL
@@ -35,7 +32,8 @@ def generate_access_token():
     taken from the DB. if refresh token is not present in DB, It is needed to
     generate using custom commands
     """
-    token_obj = ZohoPeopleFormToken.objects.filter(refresh_token__isnull=False).last()
+    # Get the latest valid refresh token
+    token_obj = ZohoPeopleFormToken.objects.filter(refresh_token__isnull=False).first()
     if not token_obj:
         logger.error("No refresh token found in database.")
         return None
