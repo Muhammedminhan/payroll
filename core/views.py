@@ -27,6 +27,9 @@ class UserNotificationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return UserNotification.objects.filter(user=self.request.user).order_by('-created_at')
 
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
 class UserProfileView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -115,11 +118,12 @@ class GoogleLoginView(APIView):
             data['token'] = token.key
             return Response(data)
 
-        except ValueError as e:
+        except ValueError:
             # Invalid token
-            return Response({'error': f'Invalid token: {str(e)}'}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({'error': 'Invalid authentication token.'}, status=status.HTTP_401_UNAUTHORIZED)
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            logger.error(f"Google login failed: {str(e)}")
+            return Response({'error': 'An unexpected error occurred during login.'}, status=status.HTTP_400_BAD_REQUEST)
 
 class AdminNotificationView(generics.ListAPIView):
     permission_classes = [permissions.IsAdminUser]
@@ -138,6 +142,8 @@ class WikiCategoryViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         name = serializer.validated_data.get('name')
+        # Wiki categories are usually created by admins, but we don't have an author field on the model.
+        # Just ensuring slug is handled.
         serializer.save(slug=slugify(name))
 
 class WikiPageViewSet(viewsets.ModelViewSet):

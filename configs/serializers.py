@@ -4,9 +4,9 @@ from .models import Component, TaxDeductedAtSource
 class ComponentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Component
-        fields = '__all__'
+        fields = ['id', 'component_name', 'operation']
 
 class TaxDeductedAtSourceSerializer(serializers.ModelSerializer):
     class Meta:
         model = TaxDeductedAtSource
-        fields = '__all__'
+        fields = ['id', 'tds_legal_name', 'tds_percentage']

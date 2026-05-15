@@ -21,6 +21,7 @@ class BankDetailSerializer(serializers.ModelSerializer):
         return acc
 
 class PayeeSerializer(serializers.ModelSerializer):
+    pan_no = serializers.SerializerMethodField()
     bank_details = BankDetailSerializer(source='bankdetails_set', many=True, read_only=True)
     class Meta:
         model = Payee
@@ -29,7 +30,14 @@ class PayeeSerializer(serializers.ModelSerializer):
             'date_of_joining', 'address', 'status', 'is_dark_mode',
             'bank_details'
         ]
-        read_only_fields = ['id', 'hrm_id', 'status', 'pan_no']
+        read_only_fields = ['id', 'hrm_id', 'status']
+
+    def get_pan_no(self, obj):
+        # Mask PAN: show only last 4 chars
+        pan = obj.pan_no
+        if pan and len(pan) > 4:
+            return f"{'*' * (len(pan) - 4)}{pan[-4:]}"
+        return pan
 
 class BankDetailAcknowledgementSerializer(serializers.ModelSerializer):
     class Meta:
