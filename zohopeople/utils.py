@@ -14,21 +14,17 @@ logger = logging.getLogger(__name__)
 
 def call_token_generation_api(url, data):
     """ Generate tokens"""
-    response = None
     try:
         response = requests.post(url=url, data=data, timeout=30)
-        response.raise_for_status()
-        logger.info("Token generation is successful")
-    except HTTPError as errh:
-        logger.warning(f"Http Error:{errh}")
-    except ConnectionError as errc:
-        logger.warning(f"Error Connecting:{errc}")
-    except Timeout as errt:
-        logger.warning(f"Timeout Error:{errt}")
+        if response.status_code == 200:
+            logger.info("Token generation is successful")
+            return response
+        else:
+            logger.warning(f"Token generation failed. Status: {response.status_code}, Body: {response.text}")
+            return response
     except RequestException as err:
-        logger.warning(f"Error in token generation API at {url}: {err}")
-
-    return response
+        logger.error(f"Network error in token generation API at {url}: {err}")
+        return None
 
 
 # function to generate access token from refresh token
@@ -71,7 +67,8 @@ def get_emp_access_token():
     token.
     """
     try:
-        latest_token_obj = ZohoPeopleFormToken.objects.latest('created')
+        # Filter by presence of token to ensure we get a usable row
+        latest_token_obj = ZohoPeopleFormToken.objects.filter(access_token__isnull=False).latest('created')
         return latest_token_obj.access_token
     except ZohoPeopleFormToken.DoesNotExist:
         logger.error("No ZohoPeopleFormToken found in database.")

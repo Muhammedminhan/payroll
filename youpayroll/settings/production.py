@@ -1,4 +1,4 @@
-from .base import DEBUG, GOOGLE_CLIENT_ID, SECRET_KEY
+from .base import *
 from django.core.exceptions import ImproperlyConfigured
 from decouple import config
 
@@ -6,7 +6,7 @@ from decouple import config
 if not DEBUG and not GOOGLE_CLIENT_ID:
     raise ImproperlyConfigured('GOOGLE_CLIENT_ID must be set in production when DEBUG is False.')
 
-# Fernet key for django-encrypted-model-fields
-FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY', default=SECRET_KEY[:32])
+# Fernet key for django-encrypted-model-fields (REQUIRED in production)
+FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY')
 
 # Add any production-specific overrides here

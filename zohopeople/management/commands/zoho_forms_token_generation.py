@@ -8,7 +8,7 @@ from zohopeople.models import ZohoPeopleFormToken
 from zohopeople.utils import call_token_generation_api
 
 
-def zoho_form_token_generation(grant_token):
+def zoho_form_token_generation(grant_token, stdout, stderr, style):
     """
     Generate Access token for sending data to Zoho People
     and Refresh token to generate new Access token. Store both
@@ -27,7 +27,6 @@ def zoho_form_token_generation(grant_token):
     tgeneration_resp = call_token_generation_api(url, tgeneration_data)
 
     if tgeneration_resp and tgeneration_resp.status_code == 200:
-        # Convert response to json data.
         tgeneration_resp_val = tgeneration_resp.json()
 
         if 'access_token' in tgeneration_resp_val and 'refresh_token' in tgeneration_resp_val:
@@ -36,13 +35,13 @@ def zoho_form_token_generation(grant_token):
                 access_token=tgeneration_resp_val['access_token'],
                 refresh_token=tgeneration_resp_val['refresh_token'])
             tokens.save()
-            print("Tokens generated and stored successfully.")
+            stdout.write(style.SUCCESS("Tokens generated and stored successfully."))
         else:
-            print(f"Error: Response missing tokens. Response: {tgeneration_resp_val}", file=sys.stderr)
+            stderr.write(style.ERROR(f"Error: Response missing tokens. Response: {tgeneration_resp_val}"))
     else:
         status = tgeneration_resp.status_code if tgeneration_resp else "No Response"
         body = tgeneration_resp.text if tgeneration_resp else ""
-        print(f"Error: Token generation failed. Status: {status}, Body: {body}", file=sys.stderr)
+        stderr.write(style.ERROR(f"Error: Token generation failed. Status: {status}, Body: {body}"))
 
 
 class Command(BaseCommand):
@@ -58,4 +57,4 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("Error: Grant token must be provided via --grant-token or ZOHO_GRANT_TOKEN env var."))
             return
             
-        zoho_form_token_generation(grant_token)
+        zoho_form_token_generation(grant_token, self.stdout, self.stderr, self.style)

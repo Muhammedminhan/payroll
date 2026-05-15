@@ -8,8 +8,6 @@ def validate_zip_file(file):
             raise ValidationError("The uploaded file is not a valid ZIP file.")
     except ValidationError:
         raise
-    except ValidationError:
-        raise
     except Exception:
         # Avoid leaking internal details to API
         raise ValidationError("An error occurred while validating the ZIP file.")

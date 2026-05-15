@@ -26,20 +26,26 @@ class ZohoUtilsTest(TestCase):
 
     @patch('requests.post')
     def test_get_payees_details_retry_on_401(self, mock_post):
-        # First call returns 401, second (after refresh) returns 200
+        # Sequence: 
+        # 1. First call returns 401
+        # 2. generate_access_token calls requests.post (returns 200)
+        # 3. Recursive call returns 200
+        
         mock_401 = MagicMock()
         mock_401.status_code = 401
         
-        mock_200 = MagicMock()
-        mock_200.status_code = 200
-        mock_200.json.return_value = {"response": {"result": [{"FirstName": "John"}]}}
+        mock_200_token = MagicMock()
+        mock_200_token.status_code = 200
+        mock_200_token.json.return_value = {"access_token": "refreshed_access"}
         
-        mock_post.side_effect = [mock_401, mock_200, mock_200] # refresh call, then second attempt
+        mock_200_data = MagicMock()
+        mock_200_data.status_code = 200
+        mock_200_data.json.return_value = {"response": {"result": [{"FirstName": "John"}]}}
+        
+        mock_post.side_effect = [mock_401, mock_200_token, mock_200_data]
 
-        # Mock generate_access_token to succeed
-        with patch('zohopeople.utils.generate_access_token') as mock_gen:
-            mock_gen.return_value = mock_200
-            response = get_payees_details("HRM123")
-            
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(mock_gen.call_count, 1)
+        response = get_payees_details("HRM123")
+        
+        self.assertEqual(response.status_code, 200)
+        # Verify 3 calls: 1st data attempt (401), token refresh, 2nd data attempt
+        self.assertEqual(mock_post.call_count, 3)
