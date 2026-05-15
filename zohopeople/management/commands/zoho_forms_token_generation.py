@@ -38,7 +38,7 @@ def zoho_form_token_generation(grant_token, stdout, stderr, style):
             tokens.save()
             stdout.write(style.SUCCESS("Tokens generated and stored successfully."))
         else:
-            stderr.write(style.ERROR(f"Error: Response missing tokens."))
+            stderr.write(style.ERROR("Error: Response missing tokens."))
     else:
         status = tgeneration_resp.status_code if tgeneration_resp else "Network Error"
         stderr.write(style.ERROR(f"Error: Token generation failed. Status: {status}"))
@@ -51,6 +51,8 @@ class Command(BaseCommand):
         parser.add_argument("--grant-token", type=str, help="OAuth grant token")
 
     def handle(self, *args, **options):
+        # NOTE: grant_token is an authorization code. While visible in ps/history,
+        # it is single-use and short-lived.
         grant_token = options.get("grant_token")
         
         if not grant_token:

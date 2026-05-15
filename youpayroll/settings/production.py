@@ -1,3 +1,5 @@
+from django.core.exceptions import ImproperlyConfigured
+from decouple import config
 from .base import *
 
 # Enforce production mode

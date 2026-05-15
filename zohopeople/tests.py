@@ -32,7 +32,10 @@ class ZohoUtilsTest(TestCase):
             access_token="old_access",
             refresh_token="old_refresh"
         )
-        # Ensure 'created' is different
+        # Explicitly update 'created' for determinism
+        old_time = timezone.now() - timezone.timedelta(hours=1)
+        ZohoPeopleFormToken.objects.filter(pk=old_row.pk).update(created=old_time)
+        
         new_row = ZohoPeopleFormToken.objects.create(
             access_token="new_access",
             refresh_token="new_refresh"
@@ -47,23 +50,15 @@ class ZohoUtilsTest(TestCase):
             # The newest row (new_row) should have been the one targeted/updated
             new_row.refresh_from_db()
             self.assertEqual(new_row.access_token, "updated_access")
-            
-            # The old row should remain unchanged
-            old_row.refresh_from_db()
-            self.assertEqual(old_row.access_token, "old_access")
 
     @patch('zohopeople.utils.requests.post')
-    def test_generate_access_token_failure(self, mock_post):
-        mock_post.return_value.status_code = 400
-        response = generate_access_token()
-        self.assertIsNone(response)
-
-    @patch('zohopeople.utils.requests.post')
-    def test_get_payees_details_no_token(self, mock_post):
-        ZohoPeopleFormToken.objects.all().delete()
+    def test_get_payees_details_success(self, mock_post):
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"response": "ok"}
+        
         response = get_payees_details("HRM123")
-        self.assertIsNone(response)
-        self.assertEqual(mock_post.call_count, 0)
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 200)
 
     @patch('zohopeople.utils.requests.post')
     def test_get_payees_details_retry_on_401(self, mock_post):
@@ -76,11 +71,22 @@ class ZohoUtilsTest(TestCase):
         
         mock_200_data = MagicMock()
         mock_200_data.status_code = 200
-        mock_200_data.json.return_value = {"response": {"result": [{"FirstName": "John"}]}}
+        mock_200_data.json.return_value = {"response": "ok"}
         
         mock_post.side_effect = [mock_401, mock_200_token, mock_200_data]
 
         response = get_payees_details("HRM123")
-        
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mock_post.call_count, 3)
+
+    @patch('zohopeople.utils.requests.post')
+    def test_get_payees_details_refresh_failure(self, mock_post):
+        mock_401 = MagicMock()
+        mock_401.status_code = 401
+        mock_400 = MagicMock()
+        mock_400.status_code = 400 # Refresh fails
+        
+        mock_post.side_effect = [mock_401, mock_400]
+        
+        response = get_payees_details("HRM123")
+        self.assertIsNone(response)

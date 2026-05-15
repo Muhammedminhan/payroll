@@ -23,6 +23,13 @@ class ReadinessCheck(View):
                 cursor.execute("SELECT 1")
             return HttpResponse("OK", status=200)
         except Exception as e:
-            # Redact DSN info by logging only the message
+            # Redact DSN info by logging only the message string
             logger.error(f"Readiness check failed: {str(e)}")
             return HttpResponse("Service Unavailable", status=503)
+
+class LegacyHealthCheck(ReadinessCheck):
+    """
+    Temporary compatibility endpoint for /health/ which is still used
+    in many Helm manifests and ingress configs.
+    """
+    pass
