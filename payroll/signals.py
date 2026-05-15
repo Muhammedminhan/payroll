@@ -4,6 +4,7 @@ import logging
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.dispatch import receiver
+from django.db import transaction
 from django.db.models.signals import post_save
 from .models import Form16, Form16Entries
 from payees.models import Payee
@@ -22,5 +23,5 @@ def extract_zip_and_create_entries(sender, instance, created, **kwargs):
         return
         
     from payroll.tasks import extract_form16_zip_task
-    extract_form16_zip_task.delay(instance.pk)
+    transaction.on_commit(lambda: extract_form16_zip_task.delay(instance.pk))
     logger.info(f"Dispatched Form16 extraction task for ID {instance.pk}")

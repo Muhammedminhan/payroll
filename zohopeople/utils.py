@@ -26,7 +26,7 @@ def call_token_generation_api(url, data):
     except Timeout as errt:
         logger.warning(f"Timeout Error:{errt}")
     except RequestException as err:
-        logger.warning(f"OOps: Something Else:{err}")
+        logger.warning(f"Error in token generation API at {url}: {err}")
 
     return response
 
@@ -51,15 +51,18 @@ def generate_access_token():
         "client_secret": config("ZOHOPEOPLE_CLIENT_SECRET"),
         "grant_type": "refresh_token"
     }
-    response = requests.post(url=url, data=data, timeout=30)
-    if response.status_code == 200:
-        # Update the existing token row instead of accumulating rows
-        token_obj.access_token = response.json().get("access_token")
-        token_obj.save(update_fields=['access_token'])
-        return response
-    else:
-        logger.warning("OOps: Some Error Occurred")
-        return response
+    try:
+        response = requests.post(url=url, data=data, timeout=30)
+        if response.status_code == 200:
+            token_obj.access_token = response.json().get("access_token")
+            token_obj.save(update_fields=['access_token'])
+            return response
+        else:
+            logger.warning(f"Failed to generate access token. Status: {response.status_code}, Body: {response.text}")
+            return response
+    except RequestException as e:
+        logger.error(f"Network error during access token generation: {e}")
+        return None
 
 
 # Function returns the latest Access token from DB.
@@ -67,8 +70,12 @@ def get_emp_access_token():
     """Fetch Access token from the DB and return the latest Access
     token.
     """
-    latest_token_obj = ZohoPeopleFormToken.objects.latest('created')
-    return latest_token_obj.access_token
+    try:
+        latest_token_obj = ZohoPeopleFormToken.objects.latest('created')
+        return latest_token_obj.access_token
+    except ZohoPeopleFormToken.DoesNotExist:
+        logger.error("No ZohoPeopleFormToken found in database.")
+        return None
 
 
 # Function to call zoho people API to get the details of payees
@@ -77,6 +84,10 @@ def get_payees_details(emp_id, retry=True):
     Calls the zoho people API to get the details of payees
     """
     access_token = get_emp_access_token()
+    if not access_token:
+        logger.error("Cannot call Zoho API without an access token.")
+        return None
+
     url = ZP_EMPLOYEE_DETAILS_API
     search_params = {"searchField": 'EmployeeID',
                      "searchOperator": 'Is',
@@ -89,16 +100,22 @@ def get_payees_details(emp_id, retry=True):
 
     body = {"searchParams": json.dumps(search_params)}
 
-    response = requests.post(url=url, headers=headers, params=body, timeout=30)
-    if response.status_code == 200:
-        return response
-
-    elif response.status_code == 401 and retry:
-        generate_access_token()
-        response = get_payees_details(emp_id, retry=False)
+    try:
+        response = requests.post(url=url, headers=headers, params=body, timeout=30)
         if response.status_code == 200:
             return response
 
-    else:
-        logger.warning("OOps: Some Error Occurred")
-    return response
+        elif response.status_code == 401 and retry:
+            gen_resp = generate_access_token()
+            if gen_resp and gen_resp.status_code == 200:
+                return get_payees_details(emp_id, retry=False)
+            else:
+                logger.error("Failed to refresh token during 401 retry.")
+                return gen_resp
+
+        else:
+            logger.warning(f"Zoho API error for emp_id {emp_id}. Status: {response.status_code}, Body: {response.text}")
+            return response
+    except RequestException as e:
+        logger.error(f"Network error calling Zoho API for emp_id {emp_id}: {e}")
+        return None

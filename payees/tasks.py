@@ -11,6 +11,12 @@ logger = logging.getLogger('celery_debug')
 @shared_task
 def fetch_details(payee_id):
     try:
+        payee = Payee.objects.get(hrm_id=payee_id)
+    except Payee.DoesNotExist:
+        logger.error(f"Payee with HRM ID {payee_id} not found locally. Skipping Zoho call.")
+        return
+
+    try:
         response = get_payees_details(payee_id)
         if response and response.status_code == 200:
             response_data = response.json()
@@ -30,20 +36,19 @@ def fetch_details(payee_id):
         response_data_list = {}
     
     if response_data_list:
-        try:
-            payee = Payee.objects.get(hrm_id=payee_id)
-        except Payee.DoesNotExist:
-            logger.error(f"Payee with HRM ID {payee_id} not found.")
-            return
-
-        for data in response_data_list.values():
-            if isinstance(data, list) and data:
-                fetched_data = data[0]
-                first_name = fetched_data.get("FirstName", "")
-                last_name = fetched_data.get("LastName", "")
-                payee.full_name = f"{first_name} {last_name}".strip()
-                payee.email = fetched_data.get("EmailID")
-                payee.pan_no = fetched_data.get("Pan_Number")
-                payee.address = fetched_data.get("Permanent_Address")
-                payee.date_of_joining = fetched_data.get("Dateofjoining")
-        payee.save()
+        # Find the first key that contains a list (the actual data)
+        fetched_data = None
+        for key, value in response_data_list.items():
+            if isinstance(value, list) and value:
+                fetched_data = value[0]
+                break
+        
+        if fetched_data:
+            payee.full_name = f"{fetched_data.get('FirstName', '')} {fetched_data.get('LastName', '')}".strip()
+            payee.email = fetched_data.get("EmailID")
+            payee.pan_no = fetched_data.get("Pan_Number")
+            payee.address = fetched_data.get("Permanent_Address")
+            payee.date_of_joining = fetched_data.get("Dateofjoining")
+            payee.save()
+        else:
+            logger.warning(f"Could not find valid payee data list in Zoho response for {payee_id}")

@@ -7,8 +7,10 @@ from .models import (PayRun, Payment, PayRunStatusChoices, PayRecordRegister, Fo
 from payees.models import Payee, BankDetails
 import os
 import zipfile
+import io
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+from django.db import transaction
 
 # For getting the named logger
 logger = logging.getLogger('celery_debug')
@@ -28,57 +30,63 @@ def run_pay_run_task(payrun_id):
         logger.warning('PayRun %s is not in DUE status. Skipping.', payrun_id)
         return
 
-    payees = Payee.objects.filter(status='active', is_deleted=False)
+    payees = Payee.objects.filter(status='active', is_deleted=False).select_related('tds_type')
     pay_run.status = PayRunStatusChoices.IN_PROGRESS
     pay_run.save()
 
     error_log = []
 
-    for payee in payees:
-        logger.info('Processing payee: %s', payee)
+    try:
+        with transaction.atomic():
+            for payee in payees:
+                logger.info('Processing payee: %s', payee)
 
-        try:
-            bank_details = BankDetails.objects.get(payee=payee, payee_acknowledgement=True)
-        except BankDetails.DoesNotExist:
-            error_log.append(f"{payee.full_name} - Missing acknowledged bank "
-                             f"details")
-            continue
+                try:
+                    bank_details = BankDetails.objects.get(payee=payee, payee_acknowledgement=True)
+                except BankDetails.DoesNotExist:
+                    error_log.append(f"{payee.full_name} - Missing acknowledged bank details")
+                    continue
 
-        try:
-            total_amount = Payment.objects.get(payee=payee)
-        except Payment.DoesNotExist:
-            error_log.append(f"{payee.full_name} - No payment data available")
-            continue
+                try:
+                    total_amount = Payment.objects.get(payee=payee)
+                except Payment.DoesNotExist:
+                    error_log.append(f"{payee.full_name} - No payment data available")
+                    continue
 
-        tds_percentage = Decimal(str(payee.tds_type.tds_percentage if payee.tds_type else 0))
-        tds_amount = (total_amount.amount * tds_percentage) / Decimal('100')
-        total_net_income = total_amount.amount - tds_amount
+                tds_percentage = Decimal(str(payee.tds_type.tds_percentage if payee.tds_type else 0))
+                tds_amount = (total_amount.amount * tds_percentage) / Decimal('100')
+                total_net_income = total_amount.amount - tds_amount
 
-        PayRecordRegister.objects.create(
-            pay_run=pay_run,
-            amount=total_amount.amount,
-            payee=payee,
-            bank_name=bank_details.bank_name,
-            account_number=bank_details.account_no,
-            account_holder_name=bank_details.account_holder_name,
-            account_type=bank_details.account_type,
-            ifsc_code=bank_details.ifsc_code,
-            micr_code=bank_details.micr_code,
-            swift_code=bank_details.swift_code,
-            branch_address=bank_details.branch_address,
-            tds_percentage=tds_percentage,
-            gross_amount=total_amount.amount,
-            net_income=total_net_income,
-        )
-        logger.info('PayRecordRegister created for payee: %s',payee.full_name )
+                PayRecordRegister.objects.create(
+                    pay_run=pay_run,
+                    amount=total_amount.amount,
+                    payee=payee,
+                    bank_name=bank_details.bank_name,
+                    account_number=bank_details.account_no,
+                    account_holder_name=bank_details.account_holder_name,
+                    account_type=bank_details.account_type,
+                    ifsc_code=bank_details.ifsc_code,
+                    micr_code=bank_details.micr_code,
+                    swift_code=bank_details.swift_code,
+                    branch_address=bank_details.branch_address,
+                    tds_percentage=tds_percentage,
+                    gross_amount=total_amount.amount,
+                    net_income=total_net_income,
+                )
+                logger.info('PayRecordRegister created for payee: %s', payee.full_name)
 
-    if error_log:
-        pay_run.error_log = '\n'.join(error_log)
-    else:
-        pay_run.error_log = 'PayRecordRegister created successfully for every payee.'
+            if error_log:
+                pay_run.error_log = '\n'.join(error_log)
+            else:
+                pay_run.error_log = 'PayRecordRegister created successfully for every payee.'
 
-    pay_run.status = PayRunStatusChoices.COMPLETED
-    pay_run.save()
+            pay_run.status = PayRunStatusChoices.COMPLETED
+            pay_run.save()
+    except Exception as e:
+        logger.error(f"Error in run_pay_run_task {payrun_id}: {e}")
+        pay_run.status = PayRunStatusChoices.REJECTED
+        pay_run.error_log = f"Critical error during pay run: {e}"
+        pay_run.save()
 
     logger.info('PayRun %s processing completed.', payrun_id)
 
@@ -93,7 +101,10 @@ def extract_form16_zip_task(form16_id):
         return
 
     try:
-        with zipfile.ZipFile(instance.form16_zip_file.open('rb')) as zip_ref:
+        with instance.form16_zip_file.open('rb') as f:
+            zip_bytes = io.BytesIO(f.read())
+            
+        with zipfile.ZipFile(zip_bytes) as zip_ref:
             for file_name in zip_ref.namelist():
                 if file_name.startswith("._") or "__MACOSX" in file_name:
                     continue
@@ -113,6 +124,7 @@ def extract_form16_zip_task(form16_id):
                     try:
                         payee = Payee.objects.get(pan_no=pan_no)
                     except Payee.DoesNotExist:
+                        logger.warning(f"Payee with PAN {pan_no} not found for file {cleaned_filename}. Creating orphan entry.")
                         payee = None
 
                     new_entry = Form16Entries(financial_year=instance, payee=payee)

@@ -23,10 +23,12 @@ export const NotificationProvider = ({ children }) => {
 
     // Initial fetch and polling
     useEffect(() => {
-        fetchNotifications();
-        const interval = setInterval(fetchNotifications, 30000); // Poll every 30s
-        return () => clearInterval(interval);
-    }, [fetchNotifications]);
+        if (isAuthenticated) {
+            fetchNotifications();
+            const interval = setInterval(fetchNotifications, 30000); // Poll every 30s
+            return () => clearInterval(interval);
+        }
+    }, [fetchNotifications, isAuthenticated]);
 
     const markAsRead = async (notifId) => {
         const token = localStorage.getItem('token');

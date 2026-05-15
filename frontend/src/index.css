@@ -24,6 +24,7 @@
   --shadow-lg: 0 10px 15px -3px var(--shadow-color);
 
   /* Spacing & Others */
+  --spacing-md: 1rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
   --radius-full: 9999px;

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL, MEDIA_BASE_URL, loginUser, googleLoginUser, getProfile } from '../api';
 
 const AuthContext = createContext(null);
@@ -43,8 +43,15 @@ export const AuthProvider = ({ children }) => {
         };
 
         initializeAuth();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+
+        const handleStorageChange = (e) => {
+            if (e.key === 'token' && !e.newValue) {
+                logout();
+            }
+        };
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, [isDarkMode, logout, syncProfile]);
 
     const toggleDarkMode = () => {
         const newMode = !isDarkMode;
@@ -57,7 +64,7 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const syncProfile = async (token) => {
+    const syncProfile = useCallback(async (token) => {
         try {
             const profileData = await getProfile(token);
             updateUserData(profileData, token);
@@ -66,9 +73,9 @@ export const AuthProvider = ({ children }) => {
             console.error('Profile sync error:', error);
             return false;
         }
-    };
+    }, [updateUserData]);
 
-    const updateUserData = (profileData, token) => {
+    const updateUserData = useCallback((profileData, token) => {
         // Construct full URL for profile picture
         let avatarUrl = profileData.profile_picture;
         if (avatarUrl && !avatarUrl.startsWith('http')) {
@@ -107,7 +114,7 @@ export const AuthProvider = ({ children }) => {
         if (token) {
             localStorage.setItem('token', token);
         }
-    }
+    }, []);
 
     const login = async (email, credential = null) => {
         try {
@@ -130,12 +137,12 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const logout = () => {
+    const logout = useCallback(() => {
         setUser(null);
         setIsAuthenticated(false);
         localStorage.removeItem('user');
         localStorage.removeItem('token');
-    };
+    }, []);
 
     return (
         <AuthContext.Provider value={{ user, isAuthenticated, login, logout, loading, isDarkMode, toggleDarkMode }}>

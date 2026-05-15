@@ -12,7 +12,9 @@ def restrict_queryset_by_group(qs, user, payee_field=None):
             return qs.filter(id=user.id)
         # Otherwise, restrict to related Payee or user field
         if payee_field:
-            payee = get_object_or_404(Payee, user=user)
+            payee = Payee.objects.filter(user=user).first()
+            if not payee:
+                return qs.none()
             return qs.filter(**{payee_field: payee})
         return qs.filter(user=user)  # fallback for generic models with user FK
 

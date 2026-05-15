@@ -31,6 +31,8 @@ urlpatterns = [
                                                                schema=schema))),
     path('accounts/', include('allauth.urls')),
     path('api/', include('core.urls')),
+    path('api/payees/', include('payees.urls')),
+    path('api/payroll/', include('payroll.urls')),
 ]
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

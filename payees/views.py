@@ -9,6 +9,8 @@ class PayeeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Payee.objects.all()
     
     def get_queryset(self):
+        if self.request.user.is_staff:
+            return Payee.objects.all()
         return Payee.objects.filter(user=self.request.user)
 
 class BankDetailViewSet(viewsets.ModelViewSet):

@@ -67,12 +67,12 @@ class BankDetails(models.Model):
         verbose_name = _("Bank Detail")
         verbose_name_plural = _("Bank Details")
 
-    def __str__(self):
-        return self.account_holder_name
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._original_state = {f.name: getattr(self, f.name) for f in self._meta.fields}
+        self._original_state = {
+            f.attname: getattr(self, f.attname) 
+            for f in self._meta.concrete_fields
+        }
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -83,7 +83,13 @@ class BankDetails(models.Model):
             if any(getattr(self, f) != self._original_state.get(f) for f in tracked_fields):
                 self.payee_acknowledgement = False
         super().save(*args, **kwargs)
-        self._original_state = {f.name: getattr(self, f.name) for f in self._meta.fields}
+        self._original_state = {
+            f.attname: getattr(self, f.attname) 
+            for f in self._meta.concrete_fields
+        }
+
+    def __str__(self):
+        return self.account_holder_name or f"BankDetails {self.pk}"
 
 
 auditlog.register(BankDetails)

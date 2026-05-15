@@ -8,7 +8,7 @@ class BankDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ['payee']
 
 class PayeeSerializer(serializers.ModelSerializer):
-    bank_details = BankDetailSerializer(many=True, read_only=True)
+    bank_details = BankDetailSerializer(source='bankdetails_set', many=True, read_only=True)
     class Meta:
         model = Payee
         fields = '__all__'

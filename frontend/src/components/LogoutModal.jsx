@@ -33,7 +33,7 @@ const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
         }
         
         .modal-content {
-          background: white;
+          background: var(--card-bg);
           padding: 2rem;
           border-radius: var(--radius-lg);
           width: 90%;
@@ -45,7 +45,7 @@ const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
         .modal-header h2 {
            font-size: 1.5rem;
            font-weight: 800;
-           color: #000;
+           color: var(--text-primary);
            margin-bottom: 0.5rem;
         }
         
@@ -63,7 +63,7 @@ const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
         .cancel-btn {
            padding: 0.75rem 1.5rem;
            border: 1px solid var(--border-color);
-           background: white;
+           background: var(--card-bg);
            color: var(--text-primary);
            border-radius: var(--radius-md);
            font-weight: 600;
