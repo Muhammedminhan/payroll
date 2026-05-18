@@ -25,8 +25,8 @@ class PayRunForm(forms.ModelForm):
 
         if self.instance.pk is not None:
             # Existing record: lock month and year from editing
-            self.fields['month'].widget.attrs['readonly'] = 'readonly'
-            self.fields['year'].widget.attrs['readonly'] = 'readonly'
+            self.fields['month'].disabled = True
+            self.fields['year'].disabled = True
 
         elif PayRun.objects.exists():
             # New record when prior PayRuns exist: auto-suggest next period
@@ -43,14 +43,14 @@ class PayRunForm(forms.ModelForm):
             if latest_payrun.status == PayRunStatusChoices.APPROVED:
                 self.fields['month'].initial = next_month
                 self.fields['year'].initial = next_year
-                self.fields['month'].widget.attrs['readonly'] = 'readonly'
-                self.fields['year'].widget.attrs['readonly'] = 'readonly'
+                self.fields['month'].disabled = True
+                self.fields['year'].disabled = True
 
             elif latest_payrun.status == PayRunStatusChoices.REJECTED:
                 self.fields['month'].initial = latest_payrun.month
                 self.fields['year'].initial = latest_payrun.year
-                self.fields['month'].widget.attrs['readonly'] = 'readonly'
-                self.fields['year'].widget.attrs['readonly'] = 'readonly'
+                self.fields['month'].disabled = True
+                self.fields['year'].disabled = True
 
             else:
                 # Default for other statuses (DUE, IN_PROGRESS, COMPLETED)
@@ -68,8 +68,8 @@ class PayRunForm(forms.ModelForm):
         cleaned_data = super().clean()
         if self.instance.pk:
             # Enforce immutability for month and year after creation
-            if cleaned_data.get('month') != self.instance.month:
+            if 'month' in self.changed_data:
                 self.add_error('month', "Month cannot be changed after creation.")
-            if cleaned_data.get('year') != self.instance.year:
+            if 'year' in self.changed_data:
                 self.add_error('year', "Year cannot be changed after creation.")
         return cleaned_data

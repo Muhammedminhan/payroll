@@ -19,6 +19,9 @@ def validate_zip_file(file):
     if not zipfile.is_zipfile(file):
         raise ValidationError("The uploaded file is not a valid ZIP file.")
 
+    # Reset file pointer after is_zipfile call
+    file.seek(0)
+
     try:
         with zipfile.ZipFile(file, 'r') as zip_ref:
             # 2. Limit entry count
@@ -38,6 +41,9 @@ def validate_zip_file(file):
                     raise ValidationError(f"ZIP member {info.filename} exceeds 10MB limit.")
                 
                 # Reject if compression ratio is unreasonably high (>100x)
+                if info.file_size > 0 and info.compress_size == 0:
+                    raise ValidationError(f"ZIP member {info.filename} is highly compressed (Zip Bomb attempt).")
+
                 if info.compress_size > 0 and (info.file_size / info.compress_size) > 100:
                     raise ValidationError(f"ZIP member {info.filename} is highly compressed (Zip Bomb attempt).")
                 
@@ -51,3 +57,6 @@ def validate_zip_file(file):
         # Log the internal details before raising a generic error to the user
         logger.exception("ZIP validation internal error")
         raise ValidationError("An error occurred while validating the ZIP file.")
+    finally:
+        # Guarantee file pointer reset for subsequent consumers
+        file.seek(0)

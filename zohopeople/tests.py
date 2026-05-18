@@ -1,5 +1,6 @@
 from unittest.mock import patch, MagicMock
 from django.utils import timezone
+from datetime import timedelta
 from zohopeople.utils import generate_access_token, get_payees_details
 from zohopeople.models import ZohoPeopleFormToken
 from django.test import TestCase
@@ -10,7 +11,7 @@ class ZohoUtilsTest(TestCase):
         ZohoPeopleFormToken.objects.create(
             access_token="old_access",
             refresh_token="valid_refresh",
-            last_refreshed_at=timezone.now() - timezone.timedelta(hours=1)
+            last_refreshed_at=timezone.now() - timedelta(hours=1)
         )
 
     @patch('zohopeople.utils.requests.post')
@@ -22,7 +23,8 @@ class ZohoUtilsTest(TestCase):
 
         response = generate_access_token()
         
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get("status"), "success")
+        self.assertEqual(response.get("access_token"), "new_access")
         token_obj = ZohoPeopleFormToken.objects.latest('created')
         self.assertEqual(token_obj.access_token, "new_access")
 
@@ -38,13 +40,13 @@ class ZohoUtilsTest(TestCase):
     def test_generate_access_token_recent_buffer_skip(self, mock_post):
         # Set last_refreshed_at to 1 minute ago
         token = ZohoPeopleFormToken.objects.latest('created')
-        token.last_refreshed_at = timezone.now() - timezone.timedelta(minutes=1)
+        token.last_refreshed_at = timezone.now() - timedelta(minutes=1)
         token.save()
         
         response = generate_access_token()
         
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json().get("status"), "cached")
+        self.assertEqual(response.get("status"), "cached")
+        self.assertEqual(response.get("access_token"), "old_access")
         self.assertEqual(mock_post.call_count, 0)
 
     @patch('zohopeople.utils.requests.post')

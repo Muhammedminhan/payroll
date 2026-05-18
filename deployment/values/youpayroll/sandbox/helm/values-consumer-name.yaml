@@ -64,7 +64,7 @@ deployment:
     
 
   nodeSelector:
-    key: 'karpenter.sh/provisioner-name'
+    key: 'karpenter.sh/nodepool'
     value: 'default'
 
   topologySpreadConstraints:

@@ -53,6 +53,12 @@ class BankDetails(models.Model):
         super().__init__(*args, **kwargs)
         self._set_state_snapshot()
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._set_state_snapshot()
+        return instance
+
     def _set_state_snapshot(self):
         # Snapshot state for mutation tracking
         self._original_state = {
@@ -72,11 +78,22 @@ class BankDetails(models.Model):
 
     def save(self, *args, **kwargs):
         # Reset acknowledgement if tracked fields changed
-        tracked_fields = self._original_state.keys()
-        if any(getattr(self, f) != self._original_state[f] for f in tracked_fields):
+        original_state = getattr(self, '_original_state', {})
+        tracked_fields = original_state.keys()
+        changed_fields = [f for f in tracked_fields if getattr(self, f) != original_state.get(f)]
+        
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None:
+            # Only reset if a tracked field being updated has actually changed in memory
+            effective_changes = [f for f in changed_fields if f in update_fields]
+        else:
+            effective_changes = changed_fields
+
+        if effective_changes:
             self.payee_acknowledgement = False
-            if 'update_fields' in kwargs and 'payee_acknowledgement' not in kwargs['update_fields']:
-                kwargs['update_fields'] = list(kwargs['update_fields']) + ['payee_acknowledgement']
+            if update_fields is not None and 'payee_acknowledgement' not in update_fields:
+                kwargs['update_fields'] = list(update_fields) + ['payee_acknowledgement']
+        
         super().save(*args, **kwargs)
         self._set_state_snapshot() # Refresh snapshot after save
 

@@ -44,10 +44,7 @@ def generate_access_token(force=False):
     if not force and token_obj.access_token and token_obj.last_refreshed_at:
         if (timezone.now() - token_obj.last_refreshed_at).total_seconds() < 300:
             logger.info("Token was recently refreshed. Skipping network call.")
-            resp = requests.Response()
-            resp.status_code = 200
-            resp._content = b'{"status": "cached"}'
-            return resp
+            return {"status": "cached", "access_token": token_obj.access_token}
 
     refresh_token = token_obj.refresh_token
     data = {
@@ -65,7 +62,7 @@ def generate_access_token(force=False):
             
             if not access_token:
                 logger.error(f"Zoho returned 200 but no access_token in body. Error: {resp_data.get('error')}")
-                return None
+                return {"status": "failed", "error": "No access token in response"}
 
             with transaction.atomic():
                 locked_token = ZohoPeopleFormToken.objects.select_for_update().get(pk=token_obj.pk)
@@ -73,13 +70,13 @@ def generate_access_token(force=False):
                 locked_token.last_refreshed_at = timezone.now()
                 locked_token.save(update_fields=['access_token', 'last_refreshed_at'])
             
-            return response
+            return {"status": "success", "access_token": access_token}
         else:
             logger.warning(f"Failed to generate access token. Status: {response.status_code}")
-            return None
+            return {"status": "failed", "error": f"HTTP {response.status_code}"}
     except RequestException as e:
         logger.error(f"Network error during access token generation: {e}")
-        return None
+        return {"status": "failed", "error": str(e)}
 
 
 def get_emp_access_token():
@@ -92,9 +89,10 @@ def get_emp_access_token():
     return latest_token_obj.access_token
 
 
-def get_payees_details(emp_id, retry=True):
+def get_payees_details(emp_id, retry=True, access_token=None):
     """Calls the zoho people API to get the details of payees."""
-    access_token = get_emp_access_token()
+    if not access_token:
+        access_token = get_emp_access_token()
     if not access_token:
         return None
 
@@ -112,8 +110,9 @@ def get_payees_details(emp_id, retry=True):
             return response
         elif response.status_code == 401 and retry:
             gen_resp = generate_access_token(force=True)
-            if gen_resp and gen_resp.status_code == 200:
-                return get_payees_details(emp_id, retry=False)
+            if gen_resp and gen_resp.get("status") in ("success", "cached"):
+                new_token = gen_resp.get("access_token")
+                return get_payees_details(emp_id, retry=False, access_token=new_token)
             return None
         elif response.status_code == 401 and not retry:
             logger.error(f"Zoho API returned 401 even after token refresh for emp_id {emp_id}.")

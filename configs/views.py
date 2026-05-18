@@ -1,5 +1,5 @@
 from rest_framework import viewsets, permissions
-from .models import Component, TaxDeductedAtSource
+from .models import Component, TDS
 from .serializers import ComponentSerializer, TaxDeductedAtSourceSerializer
 
 class ComponentViewSet(viewsets.ModelViewSet):
@@ -10,4 +10,4 @@ class ComponentViewSet(viewsets.ModelViewSet):
 class TaxDeductedAtSourceViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = TaxDeductedAtSourceSerializer
-    queryset = TaxDeductedAtSource.objects.all()
+    queryset = TDS.objects.all()

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Component, TaxDeductedAtSource
+from .models import Component, TDS
 
 class ComponentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -8,5 +8,5 @@ class ComponentSerializer(serializers.ModelSerializer):
 
 class TaxDeductedAtSourceSerializer(serializers.ModelSerializer):
     class Meta:
-        model = TaxDeductedAtSource
+        model = TDS
         fields = ['id', 'tds_legal_name', 'tds_percentage']

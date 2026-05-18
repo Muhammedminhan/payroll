@@ -7,6 +7,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from decouple import config
 from graphene_file_upload.django import FileUploadGraphQLView
+from django.views.decorators.csrf import csrf_exempt
 from youpayroll.schema import schema
 from .views import LivenessCheck, ReadinessCheck, LegacyHealthCheck
 
@@ -23,8 +24,8 @@ urlpatterns = [
     path('health/', LegacyHealthCheck.as_view(), name='health_legacy'),
     
     # GraphQL - CSRF enforcement is handled via Authentication classes in settings
-    path('graphql/', FileUploadGraphQLView.as_view(graphiql=config('ENABLE_GRAPHIQL', default=settings.DEBUG, cast=bool),
-                                                                schema=schema)),
+    path('graphql/', csrf_exempt(FileUploadGraphQLView.as_view(graphiql=config('ENABLE_GRAPHIQL', default=settings.DEBUG, cast=bool),
+                                                                schema=schema))),
     path('accounts/', include('allauth.urls')),
     path('api/', include('core.urls')),
     path('api/payees/', include('payees.urls')),

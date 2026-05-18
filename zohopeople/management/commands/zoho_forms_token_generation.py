@@ -10,6 +10,8 @@ from zohopeople.utils import call_token_generation_api
 
 logger = logging.getLogger(__name__)
 
+REDACTED_KEYS = {'access_token', 'refresh_token', 'id_token', 'client_secret'}
+
 def zoho_form_token_generation(grant_token, stdout, stderr, style):
     """
     Generate Access token for sending data to Zoho People
@@ -43,7 +45,6 @@ def zoho_form_token_generation(grant_token, stdout, stderr, style):
             stdout.write(style.SUCCESS("Tokens generated and stored successfully."))
         else:
             # Strict deny-list for redaction
-            REDACTED_KEYS = ['access_token', 'refresh_token', 'id_token', 'client_secret']
             redacted_body = {k: v for k, v in tgeneration_resp_val.items() if k.lower() not in REDACTED_KEYS}
             stderr.write(style.ERROR(f"Error: Response missing tokens. Payload: {json.dumps(redacted_body)}"))
     else:
@@ -51,14 +52,13 @@ def zoho_form_token_generation(grant_token, stdout, stderr, style):
         body_summary = ""
         if tgeneration_resp:
             try:
-                # Sanitize text response by redacting known sensitive keys before logging
-                text = tgeneration_resp.text
-                for key in ['access_token', 'refresh_token', 'client_secret']:
-                    if key in text:
-                        text = text.replace(key, "[REDACTED]")
-                body_summary = f" Body: {text[:200]}"
-            except Exception as e:
-                logger.error(f"Error reading response text: {e}")
+                # Try to parse as JSON first and redact properly
+                tgeneration_resp_val = tgeneration_resp.json()
+                redacted_body = {k: v for k, v in tgeneration_resp_val.items() if k.lower() not in REDACTED_KEYS}
+                body_summary = f" Payload: {json.dumps(redacted_body)}"
+            except Exception:
+                # If not JSON, only log status + length to avoid leaking raw body secrets
+                body_summary = f" Body Length: {len(tgeneration_resp.text)} chars"
         stderr.write(style.ERROR(f"Error: Token generation failed. Status: {status}{body_summary}"))
 
 class Command(BaseCommand):

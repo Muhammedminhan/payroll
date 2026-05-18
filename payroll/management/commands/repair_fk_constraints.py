@@ -25,7 +25,13 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # argparse converts '--lock-timeout' to 'lock_timeout'
+        import re
+        from django.core.management.base import CommandError
+
         lock_timeout = options['lock_timeout']
+        if not re.match(r'^\d+(ms|s|min)?$', lock_timeout):
+            raise CommandError("Invalid lock-timeout format. Use format like '10s', '30s', '500ms'.")
+
         strict = options['strict']
         target_apps = options['apps']
         

@@ -8,16 +8,24 @@ export const NotificationProvider = ({ children }) => {
     const { isAuthenticated } = useAuth();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(false);
+    const fetchingRef = React.useRef(false);
 
     const fetchNotifications = useCallback(async () => {
         const token = sessionStorage.getItem('token') || localStorage.getItem('token');
         if (!token || !isAuthenticated) return;
+
+        if (fetchingRef.current) return;
+        fetchingRef.current = true;
+        setLoading(true);
 
         try {
             const data = await getUserNotifications(token);
             setNotifications(data);
         } catch (err) {
             console.error('Failed to fetch notifications:', err);
+        } finally {
+            fetchingRef.current = false;
+            setLoading(false);
         }
     }, [isAuthenticated]);
 
@@ -27,15 +35,23 @@ export const NotificationProvider = ({ children }) => {
 
         fetchNotifications();
         
-        const interval = setInterval(() => {
-            if (document.visibilityState === 'visible') {
-                fetchNotifications();
-            }
-        }, 30000); // Poll every 30s only when tab is visible
+        let interval;
+
+        const startInterval = () => {
+            clearInterval(interval);
+            interval = setInterval(() => {
+                if (document.visibilityState === 'visible') {
+                    fetchNotifications();
+                }
+            }, 30000); // Poll every 30s only when tab is visible
+        };
+
+        startInterval();
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 fetchNotifications();
+                startInterval(); // Reset interval timeline on visible transition
             }
         };
 
@@ -51,15 +67,18 @@ export const NotificationProvider = ({ children }) => {
         const token = sessionStorage.getItem('token') || localStorage.getItem('token');
         if (!token) return;
 
+        // Optimistic UI update
+        const originalNotifications = [...notifications];
+        setNotifications(prev => prev.map(n =>
+            n.id === notifId ? { ...n, is_read: true } : n
+        ));
+
         try {
-            const response = await markNotificationAsRead(token, notifId);
-            if (response && response.id) {
-                setNotifications(prev => prev.map(n =>
-                    n.id === notifId ? { ...n, is_read: true } : n
-                ));
-            }
+            await markNotificationAsRead(token, notifId);
         } catch (err) {
             console.error('Failed to mark notification as read:', err);
+            // Revert to original state on network failure
+            setNotifications(originalNotifications);
         }
     };
 

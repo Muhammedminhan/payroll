@@ -6,12 +6,12 @@ from .serializers import PayeeSerializer, BankDetailSerializer, BankDetailAcknow
 class PayeeViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = PayeeSerializer
-    queryset = Payee.objects.all()
+    queryset = Payee.objects.all().order_by('hrm_id')
     
     def get_queryset(self):
         if self.request.user.is_staff:
-            return Payee.objects.all()
-        return Payee.objects.filter(user=self.request.user)
+            return Payee.objects.all().order_by('hrm_id')
+        return Payee.objects.filter(user=self.request.user).order_by('hrm_id')
 
 class BankDetailViewSet(mixins.CreateModelMixin,
                         mixins.ListModelMixin,

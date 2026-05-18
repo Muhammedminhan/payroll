@@ -62,7 +62,19 @@ def fetch_details(payee_id):
                 
             doj = fetched_data.get("Dateofjoining")
             if doj:
-                payee.date_of_joining = doj
+                from datetime import datetime
+                parsed_date = None
+                for fmt in ('%Y-%m-%d', '%d-%b-%Y', '%d-%B-%Y', '%Y/%m/%d', '%d/%m/%Y'):
+                    try:
+                        parsed_date = datetime.strptime(doj, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+                if parsed_date:
+                    payee.date_of_joining = parsed_date.isoformat()
+                else:
+                    logger.warning(f"Could not parse Dateofjoining '{doj}' into a standard format. Saving raw.")
+                    payee.date_of_joining = doj
                 
             try:
                 payee.save()

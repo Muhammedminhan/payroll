@@ -10,7 +10,7 @@ class PayRunFormTest(TestCase):
         form = PayRunForm()
         self.assertEqual(form.fields['month'].initial, 1)
         self.assertEqual(form.fields['year'].initial, 2026)
-        self.assertEqual(form.fields['month'].widget.attrs.get('readonly'), 'readonly')
+        self.assertTrue(form.fields['month'].disabled)
 
     def test_rejected_payrun_suggests_same_period(self):
         # Create a rejected payrun for Jan 2026
@@ -19,4 +19,4 @@ class PayRunFormTest(TestCase):
         form = PayRunForm()
         self.assertEqual(form.fields['month'].initial, 1)
         self.assertEqual(form.fields['year'].initial, 2026)
-        self.assertEqual(form.fields['month'].widget.attrs.get('readonly'), 'readonly')
+        self.assertTrue(form.fields['month'].disabled)
