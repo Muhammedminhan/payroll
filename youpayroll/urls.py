@@ -24,7 +24,7 @@ urlpatterns = [
     path('health/', LegacyHealthCheck.as_view(), name='health_legacy'),
     
     # GraphQL - CSRF enforcement is handled via Authentication classes in settings
-    path('graphql/', csrf_exempt(FileUploadGraphQLView.as_view(graphiql=config('ENABLE_GRAPHIQL', default=settings.DEBUG, cast=bool),
+    path('graphql/', csrf_exempt(FileUploadGraphQLView.as_view(graphiql=getattr(settings, 'ENABLE_GRAPHIQL', False),
                                                                 schema=schema))),
     path('accounts/', include('allauth.urls')),
     path('api/', include('core.urls')),

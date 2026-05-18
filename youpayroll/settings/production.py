@@ -11,6 +11,9 @@ if not GOOGLE_CLIENT_ID:
     raise ImproperlyConfigured('GOOGLE_CLIENT_ID must be set in production.')
 
 # Fernet key for django-encrypted-model-fields (REQUIRED in production)
-FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY')
+FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY', default=None)
+if not FIELD_ENCRYPTION_KEY:
+    raise ImproperlyConfigured('FIELD_ENCRYPTION_KEY must be set in production.')
 
 # Add any production-specific overrides here
+ENABLE_GRAPHIQL = False

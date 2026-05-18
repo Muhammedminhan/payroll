@@ -10,7 +10,20 @@ from zohopeople.utils import call_token_generation_api
 
 logger = logging.getLogger(__name__)
 
-REDACTED_KEYS = {'access_token', 'refresh_token', 'id_token', 'client_secret'}
+REDACTED_KEYS = {'access_token', 'refresh_token', 'id_token', 'client_secret', 'code'}
+
+def redact_sensitive_data(data):
+    """
+    Recursively redacts sensitive keys from a dictionary or list, case-insensitively.
+    """
+    if isinstance(data, dict):
+        return {
+            k: ("[REDACTED]" if k.lower() in REDACTED_KEYS else redact_sensitive_data(v))
+            for k, v in data.items()
+        }
+    elif isinstance(data, list):
+        return [redact_sensitive_data(item) for item in data]
+    return data
 
 def zoho_form_token_generation(grant_token, stdout, stderr, style):
     """
@@ -44,8 +57,7 @@ def zoho_form_token_generation(grant_token, stdout, stderr, style):
             tokens.save()
             stdout.write(style.SUCCESS("Tokens generated and stored successfully."))
         else:
-            # Strict deny-list for redaction
-            redacted_body = {k: v for k, v in tgeneration_resp_val.items() if k.lower() not in REDACTED_KEYS}
+            redacted_body = redact_sensitive_data(tgeneration_resp_val)
             stderr.write(style.ERROR(f"Error: Response missing tokens. Payload: {json.dumps(redacted_body)}"))
     else:
         status = tgeneration_resp.status_code if tgeneration_resp else "Network Error"
@@ -54,7 +66,7 @@ def zoho_form_token_generation(grant_token, stdout, stderr, style):
             try:
                 # Try to parse as JSON first and redact properly
                 tgeneration_resp_val = tgeneration_resp.json()
-                redacted_body = {k: v for k, v in tgeneration_resp_val.items() if k.lower() not in REDACTED_KEYS}
+                redacted_body = redact_sensitive_data(tgeneration_resp_val)
                 body_summary = f" Payload: {json.dumps(redacted_body)}"
             except Exception:
                 # If not JSON, only log status + length to avoid leaking raw body secrets

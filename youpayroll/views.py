@@ -26,7 +26,14 @@ class ReadinessCheck(View):
 class LegacyHealthCheck(LivenessCheck):
     """
     Temporary compatibility endpoint for /health/ which is used by ALB
-    and K8s liveness probes. Inherits from LivenessCheck to avoid 
-    killing pods on transient DB blips.
+    and K8s liveness probes. 
+    
+    DEPRECATION NOTE: The shared central Helm charts currently bind both liveness 
+    and readiness probes to a single path (.Values.deployment.containers.default.health.path).
+    Consequently, /health/ must remain a liveness check (returning 200 without DB checks) 
+    to prevent transient database network blips from killing/restarting active pods.
+    
+    Once the Helm templates support split endpoints for liveness (path: /liveness/) 
+    and readiness (path: /readiness/), this legacy endpoint should be deprecated and removed.
     """
     pass

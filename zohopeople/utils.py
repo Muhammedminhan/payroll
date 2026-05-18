@@ -46,34 +46,41 @@ def generate_access_token(force=False):
             logger.info("Token was recently refreshed. Skipping network call.")
             return {"status": "cached", "access_token": token_obj.access_token}
 
-    refresh_token = token_obj.refresh_token
-    data = {
-        "refresh_token": refresh_token,
-        "client_id": config("ZOHOPEOPLE_CLIENT_ID"),
-        "client_secret": config("ZOHOPEOPLE_CLIENT_SECRET"),
-        "grant_type": NEW_GRANT_TYPE
-    }
-
     try:
-        response = requests.post(url=url, data=data, timeout=30)
-        if response.status_code == 200:
-            resp_data = response.json()
-            access_token = resp_data.get("access_token")
+        with transaction.atomic():
+            locked_token = ZohoPeopleFormToken.objects.select_for_update().get(pk=token_obj.pk)
             
-            if not access_token:
-                logger.error(f"Zoho returned 200 but no access_token in body. Error: {resp_data.get('error')}")
-                return {"status": "failed", "error": "No access token in response"}
+            # 2. Re-verify freshness under the lock to prevent concurrent thundering herd calls
+            if not force and locked_token.access_token and locked_token.last_refreshed_at:
+                if (timezone.now() - locked_token.last_refreshed_at).total_seconds() < 300:
+                    logger.info("Token was refreshed by another worker. Skipping network call.")
+                    return {"status": "cached", "access_token": locked_token.access_token}
 
-            with transaction.atomic():
-                locked_token = ZohoPeopleFormToken.objects.select_for_update().get(pk=token_obj.pk)
+            refresh_token = locked_token.refresh_token
+            data = {
+                "refresh_token": refresh_token,
+                "client_id": config("ZOHOPEOPLE_CLIENT_ID"),
+                "client_secret": config("ZOHOPEOPLE_CLIENT_SECRET"),
+                "grant_type": NEW_GRANT_TYPE
+            }
+
+            response = requests.post(url=url, data=data, timeout=30)
+            if response.status_code == 200:
+                resp_data = response.json()
+                access_token = resp_data.get("access_token")
+                
+                if not access_token:
+                    logger.error(f"Zoho returned 200 but no access_token in body. Error: {resp_data.get('error')}")
+                    return {"status": "failed", "error": "No access token in response"}
+
                 locked_token.access_token = access_token
                 locked_token.last_refreshed_at = timezone.now()
                 locked_token.save(update_fields=['access_token', 'last_refreshed_at'])
-            
-            return {"status": "success", "access_token": access_token}
-        else:
-            logger.warning(f"Failed to generate access token. Status: {response.status_code}")
-            return {"status": "failed", "error": f"HTTP {response.status_code}"}
+                
+                return {"status": "success", "access_token": access_token}
+            else:
+                logger.warning(f"Failed to generate access token. Status: {response.status_code}")
+                return {"status": "failed", "error": f"HTTP {response.status_code}"}
     except RequestException as e:
         logger.error(f"Network error during access token generation: {e}")
         return {"status": "failed", "error": str(e)}

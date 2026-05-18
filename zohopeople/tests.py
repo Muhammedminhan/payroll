@@ -13,6 +13,15 @@ class ZohoUtilsTest(TestCase):
             refresh_token="valid_refresh",
             last_refreshed_at=timezone.now() - timedelta(hours=1)
         )
+        self.config_patcher = patch('zohopeople.utils.config')
+        self.mock_config = self.config_patcher.start()
+        self.mock_config.side_effect = lambda key, *args, **kwargs: {
+            'ZOHOPEOPLE_CLIENT_ID': 'dummy_client_id',
+            'ZOHOPEOPLE_CLIENT_SECRET': 'dummy_client_secret',
+        }.get(key, kwargs.get('default') if 'default' in kwargs else 'dummy_val')
+
+    def tearDown(self):
+        self.config_patcher.stop()
 
     @patch('zohopeople.utils.requests.post')
     def test_generate_access_token_success(self, mock_post):
@@ -63,3 +72,30 @@ class ZohoUtilsTest(TestCase):
         response = get_payees_details("HRM123")
         self.assertIsNone(response)
         self.assertEqual(mock_post.call_count, 2)
+
+    @patch('zohopeople.utils.requests.post')
+    def test_get_payees_details_refresh_success(self, mock_post):
+        # 1. First call (employee fetch) -> 401 Unauthorized
+        # 2. Second call (token refresh) -> 200 OK with fresh token
+        # 3. Third call (retried employee fetch) -> 200 OK with payee details
+        mock_401 = MagicMock()
+        mock_401.status_code = 401
+        
+        mock_refresh = MagicMock()
+        mock_refresh.status_code = 200
+        mock_refresh.json.return_value = {"access_token": "brand_new_token"}
+        
+        mock_success = MagicMock()
+        mock_success.status_code = 200
+        mock_success.json.return_value = {"status": "success", "data": "employee_data"}
+        
+        mock_post.side_effect = [mock_401, mock_refresh, mock_success]
+        
+        response = get_payees_details("HRM123")
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_post.call_count, 3)
+        
+        # Verify that the third request used the brand new token in authorization header
+        third_call_headers = mock_post.call_args_list[2][1]['headers']
+        self.assertEqual(third_call_headers['Authorization'], "Zoho-oauthtoken brand_new_token")
