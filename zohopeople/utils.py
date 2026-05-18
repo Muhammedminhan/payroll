@@ -73,9 +73,17 @@ def generate_access_token(force=False):
                     logger.error(f"Zoho returned 200 but no access_token in body. Error: {resp_data.get('error')}")
                     return {"status": "failed", "error": "No access token in response"}
 
+                rotated_refresh_token = resp_data.get("refresh_token")
                 locked_token.access_token = access_token
                 locked_token.last_refreshed_at = timezone.now()
-                locked_token.save(update_fields=['access_token', 'last_refreshed_at'])
+                
+                update_fields = ['access_token', 'last_refreshed_at']
+                if rotated_refresh_token:
+                    logger.info("Zoho returned a rotated refresh_token. Persisting it.")
+                    locked_token.refresh_token = rotated_refresh_token
+                    update_fields.append('refresh_token')
+                
+                locked_token.save(update_fields=update_fields)
                 
                 return {"status": "success", "access_token": access_token}
             else:

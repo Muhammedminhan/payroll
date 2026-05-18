@@ -99,3 +99,23 @@ class ZohoUtilsTest(TestCase):
         # Verify that the third request used the brand new token in authorization header
         third_call_headers = mock_post.call_args_list[2][1]['headers']
         self.assertEqual(third_call_headers['Authorization'], "Zoho-oauthtoken brand_new_token")
+
+    @patch('zohopeople.utils.requests.post')
+    def test_generate_access_token_with_rotation(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "access_token": "brand_new_access",
+            "refresh_token": "brand_new_rotated_refresh"
+        }
+        mock_post.return_value = mock_response
+
+        response = generate_access_token()
+        
+        self.assertEqual(response.get("status"), "success")
+        self.assertEqual(response.get("access_token"), "brand_new_access")
+        
+        token_obj = ZohoPeopleFormToken.objects.latest('created')
+        self.assertEqual(token_obj.access_token, "brand_new_access")
+        # Assert that the rotated refresh token was successfully persisted!
+        self.assertEqual(token_obj.refresh_token, "brand_new_rotated_refresh")
