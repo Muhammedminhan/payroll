@@ -26,6 +26,7 @@ services:
       - db
       - redis
     environment:
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-youpayroll.settings.development}
       SECRET_KEY: ${SECRET_KEY}
       DEBUG: ${DEBUG:-True}
       RUN_MIGRATIONS: "true"
@@ -56,6 +57,7 @@ services:
       - web
       - redis
     environment:
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-youpayroll.settings.development}
       SECRET_KEY: ${SECRET_KEY}
       DEBUG: ${DEBUG:-True}
       DATABASE_ENGINE: ${DATABASE_ENGINE:-django.db.backends.postgresql}

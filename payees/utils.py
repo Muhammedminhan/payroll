@@ -1,7 +1,7 @@
 from .models import Payee
 from .constants import RESTRICTED_PAYEE_GROUPS
 from django.contrib.auth import get_user_model
-from django.core.exceptions import FieldError
+from django.core.exceptions import FieldError, FieldDoesNotExist
 
 
 def restrict_queryset_by_group(qs, user, payee_field=None):
@@ -22,7 +22,7 @@ def restrict_queryset_by_group(qs, user, payee_field=None):
         opts = qs.model._meta
         try:
             opts.get_field('user')
-        except Exception:
+        except FieldDoesNotExist:
             raise FieldError(
                 f"Model '{qs.model.__name__}' cannot be filtered automatically: "
                 "payee_field was not specified and model has no 'user' field."

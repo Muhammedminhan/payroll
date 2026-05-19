@@ -1,8 +1,10 @@
 import os
 from celery import Celery
 
-# Set default settings module if not explicitly defined to prevent resolution failure
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'youpayroll.settings.development')
+from django.core.exceptions import ImproperlyConfigured
+
+if not os.environ.get('DJANGO_SETTINGS_MODULE'):
+    raise ImproperlyConfigured("DJANGO_SETTINGS_MODULE must be set before starting Celery.")
 
 app = Celery('youpayroll')
 app.config_from_object('django.conf:settings', namespace='CELERY')

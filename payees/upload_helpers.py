@@ -2,7 +2,7 @@ import os
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 
 def validate_image(file):
@@ -11,7 +11,7 @@ def validate_image(file):
         img.verify()
         # Reset file pointer after verify() as it consumes the stream
         file.seek(0)
-    except (IOError, SyntaxError, Image.UnidentifiedImageError) as e:
+    except (IOError, SyntaxError, UnidentifiedImageError) as e:
         raise ValidationError(f"The uploaded file is not a valid image: {e}")
 
 

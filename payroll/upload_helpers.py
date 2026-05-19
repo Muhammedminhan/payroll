@@ -1,6 +1,7 @@
 import logging
 import zipfile
 import os
+import ntpath
 from django.core.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,16 @@ def validate_zip_file(file):
                 # 3. Zip-Slip Defense: prevent path traversal (reject backslashes and catch standard traversal)
                 clean_path = info.filename.replace('\\', '/')
                 norm_path = os.path.normpath(clean_path)
-                if norm_path.startswith('/') or norm_path.startswith('..') or '..' in norm_path.split('/') or '\\' in info.filename:
+                has_drive = bool(ntpath.splitdrive(info.filename)[0])
+                if (
+                    os.path.isabs(clean_path)
+                    or ntpath.isabs(info.filename)
+                    or has_drive
+                    or norm_path.startswith('/')
+                    or norm_path.startswith('..')
+                    or '..' in norm_path.split('/')
+                    or '\\' in info.filename
+                ):
                     logger.warning(f"Zip-Slip attempt detected: {info.filename}")
                     raise ValidationError("ZIP archive contains invalid file paths (traversal attempt).")
                 

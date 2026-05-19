@@ -19,8 +19,8 @@ class ReadinessCheck(View):
             with connection.cursor() as cursor:
                 cursor.execute("SELECT 1")
             return HttpResponse("OK", status=200)
-        except Exception as e:
-            logger.error(f"Readiness check failed: {str(e)}")
+        except Exception:
+            logger.exception("Readiness check failed")
             return HttpResponse("Service Unavailable", status=503)
 
 class LegacyHealthCheck(LivenessCheck):
