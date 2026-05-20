@@ -2,9 +2,17 @@ from rest_framework import viewsets, permissions
 from .models import PayRun, Payment, PayRecordRegister, Form16, Form16Entry
 from .serializers import PayRunSerializer, PaymentSerializer, PayRecordRegisterSerializer, Form16Serializer, Form16EntrySerializer
 
-# NOTE: These viewsets are strictly ReadOnlyModelViewSet and use get_queryset to filter by request.user.
-# If converting any of these to a standard ModelViewSet in the future, you MUST implement robust
-# object-level permissions (e.g. override check_object_permissions) to prevent unauthorized mutations.
+# Authorization strategy per viewset:
+#  - PayRunViewSet      : IsAdminUser — exposes all PayRuns to admins only (no per-user filtering).
+#  - PaymentViewSet     : IsAuthenticated + get_queryset filters by request.user.
+#  - PayRecordRegisterViewSet : IsAuthenticated + get_queryset filters by request.user.
+#  - Form16ViewSet      : IsAdminUser — exposes all Form16 records to admins only (no per-user filtering).
+#  - Form16EntryViewSet : IsAuthenticated + get_queryset filters by request.user.
+#
+# NOTE: All viewsets are ReadOnlyModelViewSet. If converting any to a standard ModelViewSet,
+# you MUST implement robust object-level permissions (e.g. override check_object_permissions)
+# to prevent unauthorized mutations.
+
 
 class PayRunViewSet(viewsets.ReadOnlyModelViewSet):
     """
