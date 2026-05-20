@@ -1,23 +1,24 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, FileText, Files, User } from 'lucide-react';
+import { ROUTES } from '../constants/routes';
 
 const MobileBottomNav = () => {
     return (
         <nav className="mobile-bottom-nav">
-            <NavLink to="/" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+            <NavLink to={ROUTES.DASHBOARD} className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
                 <LayoutDashboard size={22} />
                 <span>Overview</span>
             </NavLink>
-            <NavLink to="/payslips" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+            <NavLink to={ROUTES.PAYSLIPS} className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
                 <FileText size={22} />
                 <span>Payslips</span>
             </NavLink>
-            <NavLink to="/documents" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+            <NavLink to={ROUTES.DOCUMENTS} className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
                 <Files size={22} />
                 <span>Documents</span>
             </NavLink>
-            <NavLink to="/profile" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+            <NavLink to={ROUTES.PROFILE} className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
                 <User size={22} />
                 <span>Profile</span>
             </NavLink>

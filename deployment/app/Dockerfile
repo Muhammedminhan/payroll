@@ -4,13 +4,14 @@ FROM $REQ_IMAGE
 
 WORKDIR /ygag
 
+# Switch to root temporarily to copy files and set ownership
+USER root
+
 ADD ./ /ygag
 
-# Create a non-root user and hand over ownership so the app never runs as root.
-# This also removes the need for C_FORCE_ROOT=1 in Celery workers.
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser \
-    && chown -R appuser:appgroup /ygag
+RUN chown -R ygag:ygag /ygag
 
-USER appuser
+# Switch back to the non-root user ygag (created in the base image)
+USER ygag
 
 EXPOSE 8000

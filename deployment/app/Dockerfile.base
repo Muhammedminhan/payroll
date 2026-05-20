@@ -13,3 +13,5 @@ ENV PATH "$PATH:/ygag/.local/bin"
 RUN apk update && \
     apk add --no-cache libpq libjpeg-turbo zlib libffi netcat-openbsd && \
     pip3.11 install --no-cache-dir --upgrade pip==24.0
+
+USER ygag

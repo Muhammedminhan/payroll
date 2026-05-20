@@ -1,8 +1,11 @@
 import os
+import logging
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename
 from PIL import Image, UnidentifiedImageError
+
+logger = logging.getLogger(__name__)
 
 
 def validate_image(file):
@@ -12,7 +15,8 @@ def validate_image(file):
         # Reset file pointer after verify() as it consumes the stream
         file.seek(0)
     except (IOError, SyntaxError, UnidentifiedImageError) as e:
-        raise ValidationError(f"The uploaded file is not a valid image: {e}")
+        logger.warning(f"Image validation failed: {e}", exc_info=True)
+        raise ValidationError("The uploaded file is not a valid image.")
 
 
 def user_directory_path(instance, filename):

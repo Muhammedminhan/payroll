@@ -13,7 +13,6 @@ class ZohoPeopleFormToken(models.Model):
     singleton_lock = models.BooleanField(default=True, editable=False)
 
     class Meta:
-        ordering = ['-created']
         constraints = [
             models.UniqueConstraint(
                 fields=['singleton_lock'],

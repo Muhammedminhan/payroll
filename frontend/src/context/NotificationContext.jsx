@@ -68,7 +68,6 @@ export const NotificationProvider = ({ children }) => {
         if (!token) return;
 
         // Optimistic UI update
-        const originalNotifications = [...notifications];
         setNotifications(prev => prev.map(n =>
             n.id === notifId ? { ...n, is_read: true } : n
         ));
@@ -77,8 +76,10 @@ export const NotificationProvider = ({ children }) => {
             await markNotificationAsRead(token, notifId);
         } catch (err) {
             console.error('Failed to mark notification as read:', err);
-            // Revert to original state on network failure
-            setNotifications(originalNotifications);
+            // Revert only the single notification's is_read flag on network failure
+            setNotifications(prev => prev.map(n =>
+                n.id === notifId ? { ...n, is_read: false } : n
+            ));
         }
     };
 

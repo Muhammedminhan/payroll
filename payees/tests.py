@@ -1,5 +1,6 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from payees.models import Payee, BankDetails, BankDetailsAck
 
 class BankDetailsTest(TestCase):
@@ -132,3 +133,29 @@ class BankDetailAcknowledgementAPITest(TestCase):
         
         self.bank_details.refresh_from_db()
         self.assertTrue(self.bank_details.payee_acknowledgement)
+
+
+class ValidateImageTest(TestCase):
+    def test_valid_image_passes(self):
+        import io
+        from PIL import Image
+        from payees.upload_helpers import validate_image
+        
+        img_buffer = io.BytesIO()
+        Image.new('RGB', (10, 10), color='white').save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+        
+        # Should not raise ValidationError
+        validate_image(img_buffer)
+        self.assertEqual(img_buffer.tell(), 0)
+
+    def test_invalid_image_rejected_without_leaking_details(self):
+        import io
+        from payees.upload_helpers import validate_image
+        
+        bad_buffer = io.BytesIO(b'completely invalid image content')
+        
+        with self.assertRaises(ValidationError) as ctx:
+            validate_image(bad_buffer)
+            
+        self.assertEqual(str(ctx.exception), "['The uploaded file is not a valid image.']")
