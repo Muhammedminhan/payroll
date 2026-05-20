@@ -14,18 +14,18 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='Form16Entry',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('form_16', models.FileField(upload_to=payroll.upload_helpers.form16_extracted_path)),
-                ('financial_year', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='entries', to='payroll.form16')),
-                ('payee', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='payees.payee')),
-            ],
-            options={
-                'verbose_name': 'Form 16 Entry',
-                'verbose_name_plural': 'Form 16 Entries',
-            },
+        migrations.RenameModel(
+            old_name='Form16Entries',
+            new_name='Form16Entry',
+        ),
+        migrations.AlterModelOptions(
+            name='form16entry',
+            options={'verbose_name': 'Form 16 Entry', 'verbose_name_plural': 'Form 16 Entries'},
+        ),
+        migrations.AlterField(
+            model_name='form16entry',
+            name='financial_year',
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='entries', to='payroll.form16'),
         ),
         migrations.AlterField(
             model_name='payrun',
@@ -35,8 +35,5 @@ class Migration(migrations.Migration):
         migrations.AlterUniqueTogether(
             name='payrun',
             unique_together={('month', 'year')},
-        ),
-        migrations.DeleteModel(
-            name='Form16Entries',
         ),
     ]
