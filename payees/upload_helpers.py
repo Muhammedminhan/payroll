@@ -10,13 +10,15 @@ logger = logging.getLogger(__name__)
 
 def validate_image(file):
     try:
-        img = Image.open(file)
-        img.verify()
-        # Reset file pointer after verify() as it consumes the stream
+        try:
+            img = Image.open(file)
+            img.verify()
+        except (IOError, SyntaxError, UnidentifiedImageError) as e:
+            logger.warning(f"Image validation failed: {e}", exc_info=True)
+            raise ValidationError("The uploaded file is not a valid image.")
+    finally:
+        # Reset file pointer after verify() as it consumes the stream, always running on success or failure
         file.seek(0)
-    except (IOError, SyntaxError, UnidentifiedImageError) as e:
-        logger.warning(f"Image validation failed: {e}", exc_info=True)
-        raise ValidationError("The uploaded file is not a valid image.")
 
 
 def user_directory_path(instance, filename):
