@@ -37,3 +37,30 @@ class LegacyHealthCheck(LivenessCheck):
     and readiness (path: /readiness/), this legacy endpoint should be deprecated and removed.
     """
     pass
+
+
+from django.contrib.auth.models import AnonymousUser
+from graphene_file_upload.django import FileUploadGraphQLView
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.exceptions import AuthenticationFailed
+
+class DRFTokenAuthGraphQLView(FileUploadGraphQLView):
+    """
+    A custom GraphQL view that enforces token-only authentication using DRF's 
+    TokenAuthentication. It bypasses and ignores Django's cookie-based SessionAuthentication 
+    to protect the endpoint against CSRF attacks.
+    """
+    def dispatch(self, request, *args, **kwargs):
+        authenticator = TokenAuthentication()
+        try:
+            auth_res = authenticator.authenticate(request)
+            if auth_res is not None:
+                request.user, request.auth = auth_res
+            else:
+                request.user = AnonymousUser()
+                request.auth = None
+        except AuthenticationFailed:
+            request.user = AnonymousUser()
+            request.auth = None
+        return super().dispatch(request, *args, **kwargs)
+

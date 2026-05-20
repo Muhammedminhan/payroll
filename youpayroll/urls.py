@@ -5,10 +5,9 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from graphene_file_upload.django import FileUploadGraphQLView
 from django.views.decorators.csrf import csrf_exempt
 from youpayroll.schema import schema
-from .views import LivenessCheck, ReadinessCheck, LegacyHealthCheck
+from .views import LivenessCheck, ReadinessCheck, LegacyHealthCheck, DRFTokenAuthGraphQLView
 
 
 urlpatterns = [
@@ -23,9 +22,8 @@ urlpatterns = [
     path('health/', LegacyHealthCheck.as_view(), name='health_legacy'),
     
     # GraphQL - csrf_exempt is used because authentication is strictly Token-based (stateless API).
-    # WARNING: If session-cookie (stateful) authentication is ever added/supported in the future,
-    # you MUST remove csrf_exempt and enforce standard Django CSRF middleware/checks on this view.
-    path('graphql/', csrf_exempt(FileUploadGraphQLView.as_view(graphiql=getattr(settings, 'ENABLE_GRAPHIQL', False),
+    # We bypass SessionAuthentication on the custom view to ensure CSRF is not applicable.
+    path('graphql/', csrf_exempt(DRFTokenAuthGraphQLView.as_view(graphiql=getattr(settings, 'ENABLE_GRAPHIQL', False),
                                                                 schema=schema))),
     path('accounts/', include('allauth.urls')),
     path('api/', include('core.urls')),

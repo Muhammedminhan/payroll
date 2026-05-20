@@ -5,11 +5,18 @@ echo "$DATABASE"
 
 # Check if wait-for-postgres is requested or if PostgreSQL is the active engine
 if [ "$DATABASE" = "postgres" ] || echo "$DATABASE_ENGINE" | grep -iq "postgres"; then
-    echo "Waiting for postgres..."
+    echo "Waiting for PostgreSQL at $DATABASES_HOST:$DATABASES_PORT..."
 
-    # Loop until PostgreSQL is ready to accept connections (using nc -z from netcat-openbsd)
+    # Loop until PostgreSQL is ready to accept connections or timeout is reached (60 seconds)
+    timeout=60
+    counter=0
     while ! nc -z "$DATABASES_HOST" "$DATABASES_PORT"; do
-      sleep 0.1
+      sleep 0.5
+      counter=$((counter + 1))
+      if [ $counter -ge $((timeout * 2)) ]; then
+        echo "ERROR: PostgreSQL at $DATABASES_HOST:$DATABASES_PORT did not become ready after $timeout seconds." >&2
+        exit 1
+      fi
     done
 
     echo "PostgreSQL started"

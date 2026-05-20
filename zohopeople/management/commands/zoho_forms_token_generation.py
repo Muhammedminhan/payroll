@@ -48,19 +48,32 @@ def zoho_form_token_generation(grant_token, stdout, stderr, style):
         tgeneration_resp_val = tgeneration_resp.json()
 
         if 'access_token' in tgeneration_resp_val and 'refresh_token' in tgeneration_resp_val:
-            # Store or update tokens in the DB to maintain a single row.
-            token_obj = ZohoPeopleFormToken.objects.first()
-            if token_obj:
-                token_obj.access_token = tgeneration_resp_val['access_token']
-                token_obj.refresh_token = tgeneration_resp_val['refresh_token']
-                token_obj.last_refreshed_at = timezone.now()
-                token_obj.save()
-            else:
-                ZohoPeopleFormToken.objects.create(
-                    access_token=tgeneration_resp_val['access_token'],
-                    refresh_token=tgeneration_resp_val['refresh_token'],
-                    last_refreshed_at=timezone.now()
-                )
+            # Store or update tokens in the DB using a concurrency-safe singleton pattern.
+            from django.db import transaction, IntegrityError
+            try:
+                with transaction.atomic():
+                    token_obj = ZohoPeopleFormToken.objects.select_for_update().get(id=1)
+                    token_obj.access_token = tgeneration_resp_val['access_token']
+                    token_obj.refresh_token = tgeneration_resp_val['refresh_token']
+                    token_obj.last_refreshed_at = timezone.now()
+                    token_obj.save()
+            except ZohoPeopleFormToken.DoesNotExist:
+                try:
+                    with transaction.atomic():
+                        ZohoPeopleFormToken.objects.create(
+                            id=1,
+                            access_token=tgeneration_resp_val['access_token'],
+                            refresh_token=tgeneration_resp_val['refresh_token'],
+                            last_refreshed_at=timezone.now()
+                        )
+                except IntegrityError:
+                    # Fallback if created concurrently by another process
+                    with transaction.atomic():
+                        token_obj = ZohoPeopleFormToken.objects.select_for_update().get(id=1)
+                        token_obj.access_token = tgeneration_resp_val['access_token']
+                        token_obj.refresh_token = tgeneration_resp_val['refresh_token']
+                        token_obj.last_refreshed_at = timezone.now()
+                        token_obj.save()
             stdout.write(style.SUCCESS("Tokens generated and stored/updated successfully."))
         else:
             redacted_body = redact_sensitive_data(tgeneration_resp_val)
