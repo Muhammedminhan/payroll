@@ -1,13 +1,15 @@
-#!/bin/bash
+#!/bin/sh
 
 set -m
+
+pid=0
 
 # SIGTERM handler
 term_handler() {
   echo "Caught SIGTERM signal!"
   echo "$(date) Caught SIGTERM for $HOSTNAME" >> /ygag/logs/cron.out.celery.console.log
   sleep 1
-  if [ $pid -ne 0 ]; then
+  if [ "$pid" -ne 0 ]; then
     kill -TERM "$pid"
     wait "$pid"
   fi

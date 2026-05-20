@@ -1,14 +1,14 @@
 #!/bin/sh
 set -m
 
-
+pid=0
 
 # SIGTERM handler
 term_handler() {
   echo "Caught SIGTERM signal!"
   echo "Caught SIGTERM signal!" >> /var/log/nginx/error.log
   sleep 1
-  if [ $pid -ne 0 ]; then
+  if [ "$pid" -ne 0 ]; then
     kill -QUIT "$pid"
     wait "$pid"
   fi
