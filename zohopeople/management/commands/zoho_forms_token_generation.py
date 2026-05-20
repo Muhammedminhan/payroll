@@ -48,14 +48,20 @@ def zoho_form_token_generation(grant_token, stdout, stderr, style):
         tgeneration_resp_val = tgeneration_resp.json()
 
         if 'access_token' in tgeneration_resp_val and 'refresh_token' in tgeneration_resp_val:
-            # Store tokens in the DB.
-            tokens = ZohoPeopleFormToken(
-                access_token=tgeneration_resp_val['access_token'],
-                refresh_token=tgeneration_resp_val['refresh_token'],
-                last_refreshed_at=timezone.now()
-            )
-            tokens.save()
-            stdout.write(style.SUCCESS("Tokens generated and stored successfully."))
+            # Store or update tokens in the DB to maintain a single row.
+            token_obj = ZohoPeopleFormToken.objects.first()
+            if token_obj:
+                token_obj.access_token = tgeneration_resp_val['access_token']
+                token_obj.refresh_token = tgeneration_resp_val['refresh_token']
+                token_obj.last_refreshed_at = timezone.now()
+                token_obj.save()
+            else:
+                ZohoPeopleFormToken.objects.create(
+                    access_token=tgeneration_resp_val['access_token'],
+                    refresh_token=tgeneration_resp_val['refresh_token'],
+                    last_refreshed_at=timezone.now()
+                )
+            stdout.write(style.SUCCESS("Tokens generated and stored/updated successfully."))
         else:
             redacted_body = redact_sensitive_data(tgeneration_resp_val)
             stderr.write(style.ERROR(f"Error: Response missing tokens. Payload: {json.dumps(redacted_body)}"))

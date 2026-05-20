@@ -17,10 +17,9 @@ def call_token_generation_api(url, data):
         response = requests.post(url=url, data=data, timeout=30)
         if response.status_code == 200:
             logger.info("Token generation is successful")
-            return response
         else:
             logger.warning(f"Token generation failed. Status: {response.status_code}")
-            return None
+        return response
     except RequestException as err:
         logger.error(f"Network error in token generation API at {url}: {err}")
         return None

@@ -7,8 +7,8 @@ DEBUG = False
 
 # Django SECRET_KEY (REQUIRED in production, must be strong)
 SECRET_KEY = config('SECRET_KEY', default=None)
-if not SECRET_KEY:
-    raise ImproperlyConfigured('SECRET_KEY environment variable must be set in production.')
+if not SECRET_KEY or SECRET_KEY == 'django-insecure-default-key-for-dev-and-test':
+    raise ImproperlyConfigured('SECRET_KEY environment variable must be explicitly set and secure in production.')
 
 # Explicitly read from environment to avoid NameErrors and coupling to base.py
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default=None)

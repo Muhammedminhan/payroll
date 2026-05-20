@@ -20,9 +20,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY')
-FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY')
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-default-key-for-dev-and-test')
+FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY', default='YIp_5luk_05_GOwd6xeZ7urMIajMUMwmAPHH77wjGXc=')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 
@@ -34,7 +33,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://*.yougotagift.com',
 ]
 
-DEBUG = config('DEBUG', cast=bool)
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 # Application definition
 
@@ -105,12 +104,12 @@ WSGI_APPLICATION = 'youpayroll.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': config('DATABASE_ENGINE'),
-        'NAME': config('DATABASES_NAME'),
-        'USER': config('DATABASES_USER'),
-        'PASSWORD': config('DATABASES_PASSWORD'),
-        'HOST': config('DATABASES_HOST'),
-        'PORT': config('DATABASES_PORT')
+        'ENGINE': config('DATABASE_ENGINE', default='django.db.backends.sqlite3'),
+        'NAME': config('DATABASES_NAME', default='db.sqlite3'),
+        'USER': config('DATABASES_USER', default=''),
+        'PASSWORD': config('DATABASES_PASSWORD', default=''),
+        'HOST': config('DATABASES_HOST', default='localhost'),
+        'PORT': config('DATABASES_PORT', default='')
     }
 }
 
@@ -148,24 +147,24 @@ USE_I18N = True
 USE_TZ = True
 
 
-AWS_S3_HOST = config('AWS_S3_HOST')
+AWS_S3_HOST = config('AWS_S3_HOST', default='')
 AWS_S3_BOTO_PARAMS = {
     'host': AWS_S3_HOST
 }
 
-AWS_DEFAULT_ACL = config('AWS_DEFAULT_ACL')
-AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
-AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME')
-AWS_CLOUDFRONT_DOMAIN = config('AWS_CLOUDFRONT_DOMAIN')
-AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME')
+AWS_DEFAULT_ACL = config('AWS_DEFAULT_ACL', default='')
+AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID', default='')
+AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY', default='')
+AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='')
+AWS_CLOUDFRONT_DOMAIN = config('AWS_CLOUDFRONT_DOMAIN', default='')
+AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='')
 AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.' \
                        f'{AWS_S3_REGION_NAME}.amazonaws.com'
 AWS_S3_OBJECT_PARAMETERS = {
     'CacheControl': 'max-age=86400',
 }
 AWS_LOCATION = config('AWS_LOCATION', 'staticfiles')
-AWS_QUERYSTRING_AUTH = config('AWS_QUERYSTRING_AUTH', cast=bool)
+AWS_QUERYSTRING_AUTH = config('AWS_QUERYSTRING_AUTH', default=False, cast=bool)
 AWS_S3_FILE_OVERWRITE = config('AWS_S3_FILE_OVERWRITE', default=False,
                                cast=bool)
 AWS_S3_SIGNATURE_VERSION = config('AWS_S3_SIGNATURE_VERSION', default='s3v4')
@@ -196,11 +195,11 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CELERY_BROKER_URL = config('CELERY_BROKER_URL')
-CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND')
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
 CELERY_TIMEZONE = 'Asia/Kolkata'
 
-LOGS_DIR = config('LOG_BASE_DIR')
+LOGS_DIR = config('LOG_BASE_DIR', default='logs')
 if not os.path.exists(LOGS_DIR):
     os.makedirs(LOGS_DIR)
 
