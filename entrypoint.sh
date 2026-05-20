@@ -1,8 +1,22 @@
 #!/bin/sh
 
-# Log only a safe, non-sensitive summary of the DB engine (never log raw DSNs/credentials)
-db_engine_summary=$(echo "${DATABASE_ENGINE:-$DATABASE}" | sed 's/.*\.//' | cut -c1-32)
-echo "Database engine: ${db_engine_summary}"
+# Log only the database type safely (never log connection string or credentials)
+db_to_check="${DATABASE_ENGINE:-$DATABASE}"
+case "$db_to_check" in
+  *postgres*|*postgresql*)
+    echo "Database engine: PostgreSQL"
+    ;;
+  *mysql*)
+    echo "Database engine: MySQL"
+    ;;
+  *sqlite*)
+    echo "Database engine: SQLite"
+    ;;
+  *)
+    echo "Database engine: configured"
+    ;;
+esac
+
 
 # Check if wait-for-postgres is requested or if PostgreSQL is the active engine
 if [ "$DATABASE" = "postgres" ] || echo "$DATABASE_ENGINE" | grep -iq "postgres"; then

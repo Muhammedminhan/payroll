@@ -33,8 +33,9 @@ def generate_access_token(force=False):
     url = ZP_API_ATOKEN_DOM_URL
     
     token_obj = ZohoPeopleFormToken.objects.filter(
+        id=1,
         refresh_token__isnull=False
-    ).order_by('-created').first()
+    ).first()
 
     if not token_obj:
         logger.error("No refresh token found in database.")
@@ -96,8 +97,8 @@ def generate_access_token(force=False):
 def get_emp_access_token():
     """Fetch Access token from the DB and return the latest Access token."""
     latest_token_obj = ZohoPeopleFormToken.objects.filter(
-        refresh_token__isnull=False, access_token__isnull=False
-    ).order_by('-created').only('access_token').first()
+        id=1, refresh_token__isnull=False, access_token__isnull=False
+    ).only('access_token').first()
     if not latest_token_obj:
         return None
     return latest_token_obj.access_token

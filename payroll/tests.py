@@ -106,7 +106,7 @@ class ValidateZipFileTest(TestCase):
         buf = io.BytesIO(b'Not a zip file at all \xff\xfe')
         with self.assertRaises(ValidationError) as ctx:
             validate_zip_file(buf)
-        self.assertIn('not a valid ZIP', str(ctx.exception).lower())
+        self.assertIn('not a valid zip', str(ctx.exception).lower())
 
     # ------------------------------------------------------------------
     # Zip-Slip / path traversal
@@ -202,7 +202,7 @@ class ValidateZipFileTest(TestCase):
         # Re-open and patch the ZipInfo to simulate a bomb ratio
         with zipfile.ZipFile(buf, 'r') as zf:
             infos = zf.infolist()
-        infos[0].file_size = 200 * 1024 * 1024   # claims 200 MB uncompressed
+        infos[0].file_size = 9 * 1024 * 1024   # claims 9 MB uncompressed (less than 10MB limit)
         infos[0].compress_size = 1                # but only 1 byte compressed
 
         # Patch ZipFile.infolist so validate_zip_file sees our tampered entry

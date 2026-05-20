@@ -26,11 +26,11 @@ export const googleLoginUser = async (credential) => {
         },
         body: JSON.stringify({ credential })
     });
-    const data = await response.json();
     if (!response.ok) {
-        throw new Error(data.error || 'Google login failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.detail || 'Google login failed');
     }
-    return data;
+    return response.json();
 };
 
 export const getProfile = async (token) => {

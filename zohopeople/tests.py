@@ -34,7 +34,7 @@ class ZohoUtilsTest(TestCase):
         
         self.assertEqual(response.get("status"), "success")
         self.assertEqual(response.get("access_token"), "new_access")
-        token_obj = ZohoPeopleFormToken.objects.latest('created')
+        token_obj = ZohoPeopleFormToken.objects.get(id=1)
         self.assertEqual(token_obj.access_token, "new_access")
 
     @patch('zohopeople.utils.requests.post')
@@ -48,7 +48,7 @@ class ZohoUtilsTest(TestCase):
     @patch('zohopeople.utils.requests.post')
     def test_generate_access_token_recent_buffer_skip(self, mock_post):
         # Set last_refreshed_at to 1 minute ago
-        token = ZohoPeopleFormToken.objects.latest('created')
+        token = ZohoPeopleFormToken.objects.get(id=1)
         token.last_refreshed_at = timezone.now() - timedelta(minutes=1)
         token.save()
         
@@ -115,7 +115,7 @@ class ZohoUtilsTest(TestCase):
         self.assertEqual(response.get("status"), "success")
         self.assertEqual(response.get("access_token"), "brand_new_access")
         
-        token_obj = ZohoPeopleFormToken.objects.latest('created')
+        token_obj = ZohoPeopleFormToken.objects.get(id=1)
         self.assertEqual(token_obj.access_token, "brand_new_access")
         # Assert that the rotated refresh token was successfully persisted!
         self.assertEqual(token_obj.refresh_token, "brand_new_rotated_refresh")
