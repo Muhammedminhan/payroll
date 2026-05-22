@@ -7,8 +7,8 @@ from functools import wraps
 def login_required(func):
     @wraps(func)
     def wrapper(root, info, *args, **kwargs):
-        user = info.context.user  # Access user from request context
-        if not user.is_authenticated:
+        user = getattr(info.context, "user", None)  # Access user safely from request context
+        if not getattr(user, "is_authenticated", False):
             raise GraphQLError("Authentication required.")
         return func(root, info, *args, **kwargs)
 

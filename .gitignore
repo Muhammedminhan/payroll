@@ -27,3 +27,9 @@ venv/
 venv_312/
 db.sqlite3*
 celerybeat-schedule*
+
+# Terraform — actual tfvars with real account IDs/secrets must not be committed
+# Use terraform.auto.tfvars.example as a template instead
+terraform.auto.tfvars
+*.tfvars
+!*.tfvars.example

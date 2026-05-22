@@ -1,4 +1,8 @@
 # Variables for access control helm releases
+# Copy this file to terraform.auto.tfvars and fill in the actual values.
+# DO NOT commit terraform.auto.tfvars to source control.
+# Inject AWS_ACCOUNT_ID via CI/CD secrets or Terraform Cloud variables.
+
 application_access_control_charts = [
   # users
   {
