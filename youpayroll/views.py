@@ -56,6 +56,9 @@ class DRFTokenAuthGraphQLView(FileUploadGraphQLView):
                 request.user, request.auth = auth_res
             else:
                 return JsonResponse({"detail": "Authentication credentials were not provided."}, status=401)
-        except Exception as exc:
-            return JsonResponse({"detail": str(exc)}, status=401)
+        except AuthenticationFailed:
+            return JsonResponse({"detail": "Invalid authentication credentials."}, status=401)
+        except Exception:
+            logger.exception("Unexpected GraphQL token authentication error")
+            return JsonResponse({"detail": "Internal server error."}, status=500)
         return super().dispatch(request, *args, **kwargs)

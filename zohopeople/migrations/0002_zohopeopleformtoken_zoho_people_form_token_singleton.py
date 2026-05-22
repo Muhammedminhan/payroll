@@ -6,6 +6,23 @@
 from django.db import migrations, models
 
 
+def collapse_existing_form_tokens(apps, schema_editor):
+    ZohoPeopleFormToken = apps.get_model('zohopeople', 'ZohoPeopleFormToken')
+    keeper = (
+        ZohoPeopleFormToken.objects
+        .order_by('-created', '-id')
+        .first()
+    )
+    if keeper is None:
+        return
+
+    ZohoPeopleFormToken.objects.exclude(pk=keeper.pk).delete()
+    ZohoPeopleFormToken.objects.filter(pk=keeper.pk).update(
+        id=1,
+        singleton_lock=True,
+    )
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -19,7 +36,12 @@ class Migration(migrations.Migration):
             name='singleton_lock',
             field=models.BooleanField(default=True, editable=False),
         ),
-        # Step 2: Enforce uniqueness at the DB level — only one True value allowed.
+        # Step 2: Collapse any existing duplicates before adding uniqueness.
+        migrations.RunPython(
+            collapse_existing_form_tokens,
+            reverse_code=migrations.RunPython.noop,
+        ),
+        # Step 3: Enforce uniqueness at the DB level — only one True value allowed.
         migrations.AddConstraint(
             model_name='zohopeopleformtoken',
             constraint=models.UniqueConstraint(

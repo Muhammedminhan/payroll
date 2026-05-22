@@ -1,3 +1,7 @@
+import os
+
+os.environ.setdefault('FIELD_ENCRYPTION_KEY', 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=')
+
 from .base import *
 
 DEBUG = False

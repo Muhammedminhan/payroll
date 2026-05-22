@@ -1,4 +1,4 @@
-FROM python:3.11.4-alpine3.17
+FROM python:3.11.15-alpine3.22
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 WORKDIR /youpayroll
@@ -26,4 +26,3 @@ RUN chown -R appuser:appgroup /youpayroll
 
 USER appuser
 ENTRYPOINT ["/youpayroll/entrypoint.sh"]
-
