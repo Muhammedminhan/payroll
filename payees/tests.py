@@ -109,6 +109,7 @@ class BankDetailsTest(TestCase):
         self.bank_details.save()
 
         self.bank_details.refresh_from_db()
+        self.assertEqual(self.bank_details.ifsc_code, 'NEWIFSC123')
         self.assertFalse(self.bank_details.payee_acknowledgement)
         self.assertFalse(BankDetailsAck.objects.filter(bank_details=self.bank_details).exists())
 
@@ -243,6 +244,13 @@ class BankDetailAPITest(TestCase):
         bank_details = BankDetails.objects.get(payee=self.payee)
         self.assertEqual(bank_details.bank_name, 'Updated Bank')
         self.assertEqual(bank_details.account_no, '9876543210')
+
+    def test_create_returns_201_and_post_update_returns_200(self):
+        create_response = self.client.post('/api/payees/bank-details/', {'bank_name': 'First Bank'}, format='json')
+        update_response = self.client.post('/api/payees/bank-details/', {'bank_name': 'Updated Bank'}, format='json')
+
+        self.assertEqual(create_response.status_code, 201)
+        self.assertEqual(update_response.status_code, 200)
 
     def test_patch_corrects_bank_details_and_resets_acknowledgement(self):
         bank_details = BankDetails.objects.create(

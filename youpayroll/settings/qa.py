@@ -4,6 +4,7 @@ from .base import *
 
 # Enforce QA mode
 DEBUG = False
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Explicitly validate critical environment variables
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default=None)

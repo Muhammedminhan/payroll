@@ -4,6 +4,7 @@ from .base import *
 
 # Enforce production mode
 DEBUG = False
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Django SECRET_KEY (REQUIRED in production, must be strong)
 SECRET_KEY = config('SECRET_KEY', default=None)

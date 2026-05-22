@@ -1,5 +1,8 @@
 from .base import *
 
+DEBUG = False
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # Blazing-fast in-memory SQLite database configuration for isolated test environments
 DATABASES = {
     'default': {
