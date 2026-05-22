@@ -41,6 +41,7 @@ class PayRecordRegisterSerializer(serializers.ModelSerializer):
     ifsc_code = serializers.SerializerMethodField()
     micr_code = serializers.SerializerMethodField()
     swift_code = serializers.SerializerMethodField()
+    branch_address = serializers.SerializerMethodField()
 
     class Meta:
         model = PayRecordRegister
@@ -72,3 +73,7 @@ class PayRecordRegisterSerializer(serializers.ModelSerializer):
     def get_swift_code(self, obj):
         swift = obj.swift_code or ""
         return "****" if swift else ""
+
+    def get_branch_address(self, obj):
+        addr = obj.branch_address or ""
+        return "****" if addr else ""

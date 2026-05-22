@@ -389,3 +389,40 @@ class GraphQLMaskingTest(TestCase):
         self.assertEqual(data["micrCode"], "")
         self.assertEqual(data["swiftCode"], "")
         self.assertEqual(data["branchAddress"], "")
+
+
+class PayrollRESTMaskingTest(TestCase):
+    def setUp(self):
+        from payees.models import Payee
+        from payroll.models import PayRun, PayRecordRegister
+
+        self.client = APIClient()
+        self.user = User.objects.create_user(username="restpayee", password="password")
+        self.payee = Payee.objects.create(
+            hrm_id="HRREST001",
+            user=self.user,
+            full_name="REST Payee",
+        )
+        self.client.force_authenticate(user=self.user)
+        self.pay_run = PayRun.objects.create(month=5, year=2026)
+        self.register = PayRecordRegister.objects.create(
+            payee=self.payee,
+            pay_run=self.pay_run,
+            amount=1000.00,
+            account_number="1234567890",
+            ifsc_code="IFSC001",
+            micr_code="MICR001",
+            swift_code="SWIFT001",
+            branch_address="123 Main St",
+        )
+
+    def test_pay_record_register_rest_masks_bank_details(self):
+        response = self.client.get('/api/payroll/registers/')
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()[0]
+        self.assertEqual(data["account_number"], "****7890")
+        self.assertEqual(data["ifsc_code"], "****")
+        self.assertEqual(data["micr_code"], "****")
+        self.assertEqual(data["swift_code"], "****")
+        self.assertEqual(data["branch_address"], "****")
