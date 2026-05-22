@@ -12,9 +12,12 @@ from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 from django.shortcuts import get_object_or_404
 from django.utils.text import slugify
-from .models import Profile, Payslip, Document, AdminNotification, WikiCategory, WikiPage, UserNotification
+from .models import (Profile, Payslip, Document, AdminNotification,
+                     WikiCategory, WikiPage, UserNotification,
+                     ensure_profile_completion_notification)
 from .serializers import (
-    ProfileSerializer, PayslipSerializer, 
+    ProfileSerializer, PayslipSerializer,
+    BankDetailsSerializer,
     DocumentSerializer, AdminNotificationSerializer,
     WikiCategorySerializer, WikiPageSerializer,
     UserNotificationSerializer, UserSerializer
@@ -35,6 +38,7 @@ class UserProfileView(APIView):
 
     def get(self, request):
         profile, created = Profile.objects.get_or_create(user=request.user)
+        ensure_profile_completion_notification(profile)
         serializer = ProfileSerializer(profile)
         return Response(serializer.data)
 
@@ -43,8 +47,43 @@ class UserProfileView(APIView):
         serializer = ProfileSerializer(profile, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            ensure_profile_completion_notification(profile)
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class BankDetailsView(APIView):
+    """Single source-of-truth for bank details.
+    GET  → returns the payee's current BankDetails record.
+    PATCH → updates it (resets payee_acknowledgement via the model's save()).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _get_bank_details(self, request):
+        from payees.models import BankDetails, Payee
+        try:
+            payee = Payee.objects.get(user=request.user)
+        except Payee.DoesNotExist:
+            return None, None
+        bank_detail, _ = BankDetails.objects.get_or_create(payee=payee)
+        return payee, bank_detail
+
+    def get(self, request):
+        _, bank_detail = self._get_bank_details(request)
+        if bank_detail is None:
+            return Response({'detail': 'No payee profile found for this user.'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = BankDetailsSerializer(bank_detail)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        _, bank_detail = self._get_bank_details(request)
+        if bank_detail is None:
+            return Response({'detail': 'No payee profile found for this user.'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = BankDetailsSerializer(bank_detail, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class PayslipViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
@@ -93,6 +132,13 @@ class GoogleLoginView(APIView):
             
             if not email:
                 return Response({'error': 'Email not found in token'}, status=status.HTTP_400_BAD_REQUEST)
+
+            from payees.constants import YGG_EMAIL_DOMAIN
+            if not email.endswith(f"@{YGG_EMAIL_DOMAIN}"):
+                return Response(
+                    {'error': f'Please use a valid @{YGG_EMAIL_DOMAIN} email address.'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
             try:
                 user = User.objects.get(email=email)

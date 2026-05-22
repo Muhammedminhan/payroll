@@ -19,7 +19,9 @@ class Payment(models.Model):
 
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     label = models.CharField(max_length=50)
-    payee = models.OneToOneField(Payee, on_delete=models.CASCADE)
+    payee = models.ForeignKey(Payee, on_delete=models.CASCADE)
+    effective_from = models.DateField(default=timezone.now)
+    effective_to = models.DateField(null=True, blank=True)
 
     class Meta:
         verbose_name = _("Payment")
@@ -90,7 +92,7 @@ class PayRecordRegister(models.Model):
     payee = models.ForeignKey(Payee, on_delete=models.CASCADE)
 
     bank_name = models.CharField(max_length=100, null=True, blank=True)
-    account_number = models.CharField(null=True, blank=True, max_length=16)
+    account_number = models.CharField(null=True, blank=True, max_length=100)
     account_holder_name = models.CharField(max_length=100, null=True,
                                            blank=True)
     account_type = models.CharField(max_length=10, null=True, blank=True)
@@ -134,6 +136,7 @@ class Form16(models.Model):
     form16_zip_file = models.FileField(upload_to='uploads/payroll/form16/',
                                        validators=[validate_zip_file])
     is_extracted = models.BooleanField(default=False)
+    extraction_summary = models.TextField(blank=True, default='')
 
     def __str__(self):
         return self.financial_year

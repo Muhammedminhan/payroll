@@ -19,8 +19,8 @@ class Form16Serializer(serializers.ModelSerializer):
     entries = Form16EntrySerializer(many=True, read_only=True)
     class Meta:
         model = Form16
-        fields = ['id', 'financial_year', 'uploaded_on', 'form16_zip_file', 'is_extracted', 'entries']
-        read_only_fields = ['uploaded_on', 'is_extracted']
+        fields = ['id', 'financial_year', 'uploaded_on', 'form16_zip_file', 'is_extracted', 'extraction_summary', 'entries']
+        read_only_fields = ['uploaded_on', 'is_extracted', 'extraction_summary']
 
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:

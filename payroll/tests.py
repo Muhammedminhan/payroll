@@ -1,12 +1,15 @@
 import io
 import zipfile
+from unittest import mock
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from .forms import PayRunForm
 from .models import PayRun, PayRunStatusChoices
+from .tasks import extract_form16_zip_task
 from .upload_helpers import validate_zip_file
+from .utils import get_latest_payrun
 
 
 # ---------------------------------------------------------------------------
@@ -52,6 +55,21 @@ def _make_zip_with_info(info, data, compress_type=zipfile.ZIP_STORED):
 # ---------------------------------------------------------------------------
 
 class PayRunFormTest(TestCase):
+    def test_latest_payrun_uses_period_before_created_at(self):
+        older_period_created_later = PayRun.objects.create(
+            month=12,
+            year=2025,
+            status=PayRunStatusChoices.APPROVED,
+        )
+        latest_period = PayRun.objects.create(
+            month=1,
+            year=2026,
+            status=PayRunStatusChoices.DUE,
+        )
+
+        self.assertEqual(get_latest_payrun(), latest_period)
+        self.assertNotEqual(get_latest_payrun(), older_period_created_later)
+
     def test_suggested_next_period(self):
         # Create an approved payrun for Dec 2025
         PayRun.objects.create(month=12, year=2025, status=PayRunStatusChoices.APPROVED)
@@ -255,3 +273,58 @@ class ValidateZipFileTest(TestCase):
                 validate_zip_file(buf)
         self.assertIn('200mb', str(ctx.exception).lower())
 
+
+class ExtractForm16ZipTaskTest(TestCase):
+    def test_passes_open_file_directly_to_zipfile(self):
+        opened_zip_file = mock.Mock()
+        opened_zip_file.read.side_effect = AssertionError("ZIP archive was read fully into memory")
+
+        form16_file = mock.MagicMock()
+        form16_file.open.return_value.__enter__.return_value = opened_zip_file
+
+        form16 = mock.Mock()
+        form16.form16_zip_file = form16_file
+        form16.is_extracted = False
+
+        zip_ref = mock.MagicMock()
+        zip_ref.namelist.return_value = []
+
+        with (
+            mock.patch('payroll.tasks.Form16.objects.get', return_value=form16),
+            mock.patch('payroll.tasks.zipfile.ZipFile') as zip_file_cls,
+        ):
+            zip_file_cls.return_value.__enter__.return_value = zip_ref
+            extract_form16_zip_task(1)
+
+        zip_file_cls.assert_called_once_with(opened_zip_file, 'r')
+        opened_zip_file.read.assert_not_called()
+        self.assertEqual(
+            form16.extraction_summary,
+            "No PDF or XML Form 16 files found in the ZIP archive.",
+        )
+        form16.save.assert_called_once_with(update_fields=['is_extracted', 'extraction_summary'])
+
+    def test_records_invalid_pan_filename_in_extraction_summary(self):
+        zip_ref = mock.MagicMock()
+        zip_ref.namelist.return_value = ['changed-zoho-name.pdf']
+        zip_ref.read.return_value = b'%PDF-form16'
+
+        form16_file = mock.MagicMock()
+        form16 = mock.Mock()
+        form16.form16_zip_file = form16_file
+        form16.is_extracted = False
+
+        with (
+            mock.patch('payroll.tasks.Form16.objects.get', return_value=form16),
+            mock.patch('payroll.tasks.zipfile.ZipFile') as zip_file_cls,
+            mock.patch('payroll.tasks.default_storage.exists', return_value=False),
+        ):
+            zip_file_cls.return_value.__enter__.return_value = zip_ref
+            extract_form16_zip_task(1)
+
+        self.assertIn("Extracted 0 file(s).", form16.extraction_summary)
+        self.assertIn(
+            "- changed-zoho-name.pdf: could not derive a valid PAN from filename",
+            form16.extraction_summary,
+        )
+        form16.save.assert_called_once_with(update_fields=['is_extracted', 'extraction_summary'])

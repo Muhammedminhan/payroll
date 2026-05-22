@@ -21,7 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-default-key-for-dev-and-test')
-FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY', default='YIp_5luk_05_GOwd6xeZ7urMIajMUMwmAPHH77wjGXc=')
+FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 
@@ -237,10 +237,6 @@ GRAPHENE = {
     'SCHEMA': 'youpayroll.schema.schema',
 }
 
-AUTHENTICATION_BACKENDS = [
-    "django.contrib.auth.backends.ModelBackend",
-]
-
 SITE_ID = 1
 
 AUTHENTICATION_BACKENDS = [
@@ -274,6 +270,7 @@ GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
 
 CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bool)
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:5173,http://127.0.0.1:5173').split(',')
+CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [

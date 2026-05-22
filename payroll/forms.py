@@ -3,6 +3,7 @@ import datetime
 from django import forms
 
 from .models import PayRunStatusChoices, PayRun
+from .utils import get_latest_payrun
 
 
 class PayRunForm(forms.ModelForm):
@@ -30,8 +31,7 @@ class PayRunForm(forms.ModelForm):
 
         elif PayRun.objects.exists():
             # New record when prior PayRuns exist: auto-suggest next period
-            # Order by year/month to find the chronologically latest run
-            latest_payrun = PayRun.objects.order_by('-year', '-month').first()
+            latest_payrun = get_latest_payrun()
             next_month = latest_payrun.month + 1
             next_year = latest_payrun.year
 

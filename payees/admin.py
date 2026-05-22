@@ -42,9 +42,9 @@ class PayeeAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
         # Automatically trigger fetch on save
         try:
-            fetch_details(obj.hrm_id)
+            fetch_details.delay(obj.hrm_id)
         except Exception as e:
-            logger.error(f"Auto-fetch failed for {obj.hrm_id}: {e}")
+            logger.error(f"Auto-fetch enqueue failed for {obj.hrm_id}: {e}")
 
     def fetch_zoho_button(self, obj):
         if obj.id:
@@ -60,25 +60,24 @@ class PayeeAdmin(admin.ModelAdmin):
         error_count = 0
         for payee in queryset:
             try:
-                # We call fetch_details directly since CELERY_TASK_ALWAYS_EAGER is True
-                fetch_details(payee.hrm_id)
+                fetch_details.delay(payee.hrm_id)
                 success_count += 1
             except Exception as e:
                 error_count += 1
-                logger.error(f"Error fetching Zoho details for {payee.hrm_id}: {e}")
+                logger.error(f"Error enqueueing Zoho details fetch for {payee.hrm_id}: {e}")
         
         if success_count:
-            self.message_user(request, f"Successfully fetched details for {success_count} payees.")
+            self.message_user(request, f"Queued Zoho detail sync for {success_count} payees.")
         if error_count:
-            self.message_user(request, f"Failed to fetch details for {error_count} payees. Check if Zoho tokens are configured.", messages.ERROR)
+            self.message_user(request, f"Failed to queue Zoho detail sync for {error_count} payees.", messages.ERROR)
 
     def response_change(self, request, obj):
         if "_fetch_zoho" in request.POST:
             try:
-                fetch_details(obj.hrm_id)
-                self.message_user(request, "Successfully fetched details from Zoho.")
+                fetch_details.delay(obj.hrm_id)
+                self.message_user(request, "Queued Zoho detail sync.")
             except Exception as e:
-                self.message_user(request, f"Error fetching from Zoho: {e}", messages.ERROR)
+                self.message_user(request, f"Error queueing Zoho detail sync: {e}", messages.ERROR)
             return super().response_change(request, obj)
         return super().response_change(request, obj)
 

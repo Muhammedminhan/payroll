@@ -41,6 +41,12 @@ def check_latest_payrun(modeladmin, request, selected_payrun, latest_payrun):
     return False
 
 
+def get_latest_payrun():
+    from .models import PayRun
+
+    return PayRun.objects.order_by('-year', '-month', '-created_at').first()
+
+
 def get_month_name(month):
     """
     Retrieve the name of the month corresponding to the given month integer.

@@ -13,11 +13,7 @@ class BankDetailSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        acc = instance.account_no or ""
-        if acc:
-            ret['account_no'] = "**********"
-        else:
-            ret['account_no'] = ""
+        ret['account_no'] = instance.masked_account_no
         return ret
 
     def to_internal_value(self, data):
@@ -40,11 +36,7 @@ class PayeeSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        pan = instance.pan_no or ""
-        if pan:
-            ret['pan_no'] = "**********"
-        else:
-            ret['pan_no'] = ""
+        ret['pan_no'] = instance.masked_pan_no
         return ret
 
     def to_internal_value(self, data):

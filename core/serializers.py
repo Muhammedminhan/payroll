@@ -15,14 +15,14 @@ class Base64ImageField(serializers.ImageField):
     def to_internal_value(self, data):
         if isinstance(data, str) and data.startswith('data:image'):
             # Validate MIME type
-            allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
+            allowed_types = ['image/jpeg', 'image/jpg', 'image/png']
             header_end = data.find(';')
             if header_end == -1:
                 raise serializers.ValidationError("Invalid data URI format.")
             
             mime_type = data[5:header_end]
             if mime_type not in allowed_types:
-                raise serializers.ValidationError(f"Unsupported image type: {mime_type}. Use JPG, PNG or GIF.")
+                raise serializers.ValidationError(f"Unsupported image type: {mime_type}. Use JPG or PNG.")
 
             try:
                 header, imgstr = data.split(';base64,')
@@ -100,16 +100,40 @@ class PayslipSerializer(serializers.ModelSerializer):
         return getattr(obj.user.profile, 'consultant_id', '') if hasattr(obj.user, 'profile') else ''
 
     def get_account_number(self, obj):
-        acc = getattr(obj.user.profile, 'account_number', '') if hasattr(obj.user, 'profile') else ''
-        if acc and len(acc) > 4:
-            return f"{'*' * (len(acc) - 4)}{acc[-4:]}"
-        return acc
+        from payees.models import BankDetails
+        bank_detail = BankDetails.objects.filter(payee__user=obj.user).first()
+        return bank_detail.masked_account_no if bank_detail else ''
 
     def get_ifsc_code(self, obj):
-        return getattr(obj.user.profile, 'ifsc_code', '') if hasattr(obj.user, 'profile') else ''
+        from payees.models import BankDetails
+        bank_detail = BankDetails.objects.filter(payee__user=obj.user).first()
+        return bank_detail.ifsc_code if bank_detail else ''
 
     def get_branch_address(self, obj):
-        return getattr(obj.user.profile, 'branch_address', '') if hasattr(obj.user, 'profile') else ''
+        from payees.models import BankDetails
+        bank_detail = BankDetails.objects.filter(payee__user=obj.user).first()
+        return bank_detail.branch_address if bank_detail else ''
+
+
+class BankDetailsSerializer(serializers.ModelSerializer):
+    """Serializer for the canonical payees.BankDetails model.
+    Read path returns masked account number; write path accepts plain text
+    (masking is display-only).
+    """
+    from payees.models import BankDetails
+    account_no = serializers.CharField(read_only=True, source='masked_account_no')
+    account_no_plain = serializers.CharField(write_only=True, required=False, source='account_no')
+
+    class Meta:
+        from payees.models import BankDetails
+        model = BankDetails
+        fields = [
+            'id', 'bank_name', 'account_no', 'account_no_plain',
+            'account_holder_name', 'account_type',
+            'ifsc_code', 'micr_code', 'swift_code', 'branch_address',
+            'payee_acknowledgement',
+        ]
+        read_only_fields = ['id', 'payee_acknowledgement']
 
 class DocumentSerializer(serializers.ModelSerializer):
     class Meta:

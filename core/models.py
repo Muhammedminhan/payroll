@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.validators import FileExtensionValidator
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from auditlog.registry import auditlog
@@ -22,13 +23,12 @@ class Profile(models.Model):
     reporting_to_name = models.CharField(max_length=100, blank=True)
     reporting_to_role = models.CharField(max_length=100, blank=True)
     
-    # Bank Details
-    account_number = models.CharField(max_length=50, blank=True)
-    ifsc_code = models.CharField(max_length=20, blank=True)
-    micr_code = models.CharField(max_length=20, blank=True)
-    branch_address = models.TextField(blank=True)
-    
-    profile_picture = models.ImageField(upload_to='profiles/', null=True, blank=True)
+    profile_picture = models.ImageField(
+        upload_to='profiles/',
+        null=True,
+        blank=True,
+        validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png'])],
+    )
 
     def __str__(self):
         return f"{self.user.username}'s Profile"
@@ -122,32 +122,64 @@ class UserNotification(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.title}"
 
-@receiver(post_save, sender=Profile)
-def notify_profile_update(sender, instance, created, **kwargs):
-    # Trigger on both creation and update to ensure user sees the requirement
-    # Prevent spamming: only notify if no ACTION_REQUIRED notif exists OR the last one was over 5 mins ago
+USER_PROFILE_COMPLETION_FIELDS = (
+    ('first_name', 'First name'),
+    ('last_name', 'Last name'),
+)
+
+PROFILE_COMPLETION_FIELDS = (
+    ('designation', 'Designation'),
+    ('gender', 'Gender'),
+    ('dob', 'Date of birth'),
+)
+
+
+def get_missing_profile_fields(profile):
+    missing_fields = []
+    user = profile.user
+
+    for field_name, label in USER_PROFILE_COMPLETION_FIELDS:
+        if not getattr(user, field_name):
+            missing_fields.append(label)
+
+    for field_name, label in PROFILE_COMPLETION_FIELDS:
+        if not getattr(profile, field_name):
+            missing_fields.append(label)
+
+    return missing_fields
+
+
+def ensure_profile_completion_notification(profile):
+    missing_fields = get_missing_profile_fields(profile)
+    if not missing_fields:
+        return
+
     recent_threshold = timezone.now() - datetime.timedelta(minutes=5)
-    existing = UserNotification.objects.filter(
-        user=instance.user,
+    has_unread = UserNotification.objects.filter(
+        user=profile.user,
         notification_type='ACTION_REQUIRED',
         is_read=False
     ).exists()
-    
-    # Also check if we just created one recently to avoid echo
-    recent = UserNotification.objects.filter(
-        user=instance.user,
+
+    was_recently_sent = UserNotification.objects.filter(
+        user=profile.user,
         notification_type='ACTION_REQUIRED',
         created_at__gt=recent_threshold
     ).exists()
-    
-    if not existing and not recent:
-        UserNotification.objects.create(
-            user=instance.user,
-            notification_type='ACTION_REQUIRED',
-            is_read=False,
-            title="Let's get this done!",
-            message="Kindly share the confirmation screenshot for the payment after updating your profile."
+
+    if has_unread or was_recently_sent:
+        return
+
+    UserNotification.objects.create(
+        user=profile.user,
+        notification_type='ACTION_REQUIRED',
+        is_read=False,
+        title="Complete your profile",
+        message=(
+            "Please complete the missing profile details: "
+            f"{', '.join(missing_fields)}."
         )
+    )
 auditlog.register(Profile)
 auditlog.register(Payslip)
 auditlog.register(Document)

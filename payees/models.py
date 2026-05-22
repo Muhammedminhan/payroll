@@ -23,6 +23,10 @@ class Payee(SafeDeleteModel):
     email = models.EmailField(max_length=100, null=True, blank=True)
     pan_no = models.CharField(max_length=10, unique=True, null=True,
                                blank=True)
+
+    @property
+    def masked_pan_no(self):
+        return "**********" if self.pan_no else ""
     date_of_joining = models.CharField(max_length=50, null=True, blank=True)
     address = models.TextField(null=True, blank=True)
     is_dark_mode = models.BooleanField(default=False,
@@ -49,6 +53,13 @@ class BankDetails(models.Model):
     swift_code = models.CharField(max_length=100, null=True, blank=True)
     branch_address = models.TextField(null=True, blank=True)
     payee_acknowledgement = models.BooleanField(default=False, editable=False)
+
+    @property
+    def masked_account_no(self):
+        acc = self.account_no or ""
+        if acc and len(acc) > 4:
+            return f"{'*' * (len(acc) - 4)}{acc[-4:]}"
+        return "**********" if acc else ""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

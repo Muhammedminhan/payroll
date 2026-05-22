@@ -1,8 +1,9 @@
 from django.contrib import messages
 
-from .models import PayRun, PayRunStatusChoices, Payee
+from .models import PayRunStatusChoices, Payee
 from .tasks import run_pay_run_task
-from .utils import check_single_payrun_selection, check_latest_payrun
+from .utils import (check_single_payrun_selection, check_latest_payrun,
+                    get_latest_payrun)
 
 
 def approve_payrun_action(modeladmin, request, queryset):
@@ -13,7 +14,7 @@ def approve_payrun_action(modeladmin, request, queryset):
     selected_payrun = queryset.first()
 
     # Retrieves the most recent PayRun or None if none exist.
-    latest_payrun = PayRun.objects.last()
+    latest_payrun = get_latest_payrun()
 
     if check_single_payrun_selection(queryset, modeladmin, request) == False:
         return
@@ -42,7 +43,7 @@ def reject_payrun_action(modeladmin, request, queryset):
     selected_payrun = queryset.first()
 
     # Retrieves the most recent PayRun or None if none exist.
-    latest_payrun = PayRun.objects.last()
+    latest_payrun = get_latest_payrun()
 
     if check_single_payrun_selection(queryset, modeladmin, request) == False:
         return
@@ -76,7 +77,7 @@ def run_payrun_action(modeladmin, request, queryset):
     selected_payrun = queryset.first()
 
     # Retrieves the most recent PayRun or None if none exist.
-    latest_payrun = PayRun.objects.last()
+    latest_payrun = get_latest_payrun()
 
     if check_single_payrun_selection(queryset, modeladmin, request) == False:
         return
@@ -138,7 +139,7 @@ def is_payrun_exists(request):
     indicating that a new PayRun cannot be created until the existing one is
     finished. Otherwise, it returns False.
     """
-    latest_payrun = PayRun.objects.last()
+    latest_payrun = get_latest_payrun()
     if latest_payrun:
         conflicting_statuses = [
             PayRunStatusChoices.DUE,

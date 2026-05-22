@@ -36,7 +36,7 @@ class PayRunAdmin(admin.ModelAdmin):
     list_filter = ('status', 'month', 'year')
     search_fields = ('status', 'get_month_name', 'year')
     readonly_fields = ('status', 'created_at','error_log_summary')
-    ordering = ['-created_at']
+    ordering = ['-year', '-month', '-created_at']
     actions = ['run_payrun', 'approve_payrun', 'reject_payrun']
     form = PayRunForm
 
@@ -176,7 +176,7 @@ class PayRecordRegisterAdmin(admin.ModelAdmin):
                 # Autopopulate amount from Payment if not provided
                 if not obj.amount:
                     try:
-                        payment = Payment.objects.get(payee=obj.payee)
+                        payment = Payment.objects.filter(payee=obj.payee).latest('effective_from')
                         obj.amount = payment.amount
                     except Payment.DoesNotExist:
                         pass
@@ -220,14 +220,14 @@ class PayRecordRegisterAdmin(admin.ModelAdmin):
 
     def get_total_earnings(self, obj):
         return sum(c.value for c in obj.components.filter(
-            component__operation='Sum'))
+            component__operation='sum'))
 
     get_total_earnings.short_description = 'Total Earnings'
 
     def get_total_deductions(self, obj):
         return sum(
             c.value for c in obj.components.filter(
-                component__operation='Subtract'))
+                component__operation='subtract'))
 
     get_total_deductions.short_description = 'Total Deductions'
 
@@ -318,7 +318,8 @@ class Form16Inline(admin.TabularInline):  # or StackedInline
 
 
 class Forms16Admin(admin.ModelAdmin):
-    list_display = ('financial_year', 'form_16_link', 'view_form_entries')
+    list_display = ('financial_year', 'form_16_link', 'extraction_status', 'view_form_entries')
+    readonly_fields = ('extraction_summary',)
 
     def form_16_link(self, obj):
         if obj.form16_zip_file:
@@ -330,6 +331,15 @@ class Forms16Admin(admin.ModelAdmin):
         return "No File"
 
     form_16_link.short_description = "Form 16 File"
+
+    def extraction_status(self, obj):
+        if not obj.is_extracted:
+            return "Pending"
+        if obj.extraction_summary and "Skipped file(s):" in obj.extraction_summary:
+            return "Extracted with skipped files"
+        return "Extracted"
+
+    extraction_status.short_description = "Extraction Status"
 
     def view_form_entries(self, obj):
         """

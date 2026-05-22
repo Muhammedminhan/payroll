@@ -28,16 +28,12 @@ class ReadinessCheck(View):
 
 class LegacyHealthCheck(LivenessCheck):
     """
-    Temporary compatibility endpoint for /health/ which is used by ALB
-    and K8s liveness probes. 
-    
-    DEPRECATION NOTE: The shared central Helm charts currently bind both liveness 
-    and readiness probes to a single path (.Values.deployment.containers.default.health.path).
-    Consequently, /health/ must remain a liveness check (returning 200 without DB checks) 
-    to prevent transient database network blips from killing/restarting active pods.
-    
-    Once the Helm templates support split endpoints for liveness (path: /liveness/) 
-    and readiness (path: /readiness/), this legacy endpoint should be deprecated and removed.
+    Compatibility endpoint for /health/ which is used by ALB health checks.
+
+    Kubernetes probes use split endpoints in Helm values:
+    /health/live/ for startup/liveness and /health/ready/ for readiness.
+    Keep this legacy path lightweight so ALB health checks do not depend on
+    transient database availability.
     """
     pass
 
@@ -60,7 +56,6 @@ class DRFTokenAuthGraphQLView(FileUploadGraphQLView):
                 request.user, request.auth = auth_res
             else:
                 return JsonResponse({"detail": "Authentication credentials were not provided."}, status=401)
-        except AuthenticationFailed as exc:
+        except Exception as exc:
             return JsonResponse({"detail": str(exc)}, status=401)
         return super().dispatch(request, *args, **kwargs)
-

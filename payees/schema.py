@@ -15,6 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 class PayeeType(DjangoObjectType):
+    pan_no = graphene.String()
+
+    def resolve_pan_no(self, info):
+        return self.masked_pan_no
+
     class Meta:
         """
         This section displays the personal data of the payee or employee,
@@ -26,6 +31,11 @@ class PayeeType(DjangoObjectType):
 
 
 class BankDetailsType(DjangoObjectType):
+    account_no = graphene.String()
+
+    def resolve_account_no(self, info):
+        return self.masked_account_no
+
     class Meta:
         """
         This section displays the bank details of the employee.
@@ -109,11 +119,6 @@ class BaseMutation(graphene.Mutation):
         cls.check_authorization(info.context)
         payee = cls.get_payee(info.context.user)
 
-        # Ensure the authenticated user is the same as the Payee
-        if payee.user != info.context.user:
-            raise GraphQLError(
-                "You are not authorized to perform this action.")
-
         return cls.perform_mutation(root, info, payee=payee, **kwargs)
 
     @classmethod
@@ -140,7 +145,7 @@ class SetDarkMutation(BaseMutation):
     success = graphene.Boolean()
     message = graphene.String()
 
-    @login_required
+    @classmethod
     def perform_mutation(cls, root, info, payee, **kwargs):
         is_dark_mode = kwargs.get("is_dark_mode")
 
@@ -172,21 +177,24 @@ class CreateBankDetailsAck(BaseMutation):
 
     bank_details_ack = graphene.Field(BankDetailsAckType)
 
-    @staticmethod
-    @login_required
+    @classmethod
     def perform_mutation(cls, root, info, payee, **kwargs):
         bank_detail_screenshot = kwargs.get("bank_detail_screenshot")
-        is_approved = kwargs.get("is_approved", False)
         correction_comments = kwargs.get("correction_comments")
 
         # Validate and save image
         cls.validate_image_input(bank_detail_screenshot)
 
+        bank_details = BankDetails.objects.filter(payee=payee).order_by('-id').first()
+        if not bank_details:
+            raise GraphQLError("No bank details record found to acknowledge.")
+
         # Save the BankDetailsAck instance
         bank_details_ack = BankDetailsAck.objects.create(
             payee=payee,
+            bank_details=bank_details,
             bank_details_screenshot=bank_detail_screenshot,
-            is_approved=is_approved,
+            is_approved=False,
             correction_comments=correction_comments,
         )
         return CreateBankDetailsAck(bank_details_ack=bank_details_ack)

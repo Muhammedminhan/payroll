@@ -58,18 +58,21 @@ deployment:
         port: 8000
         scheme: 'HTTP'
       startupProbe:
+        path: '/health/live/'
         initialDelaySeconds: 10
         periodSeconds: 5
         timeoutSeconds: 5
         successThreshold: 1
         failureThreshold: 7
       readinessProbe:
+        path: '/health/ready/'
         initialDelaySeconds: 0
         periodSeconds: 15
         timeoutSeconds: 5
         successThreshold: 1
         failureThreshold: 3
       livenessProbe:
+        path: '/health/live/'
         initialDelaySeconds: 0
         periodSeconds: 15
         timeoutSeconds: 5

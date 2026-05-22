@@ -1,9 +1,12 @@
 from unittest.mock import patch
+import datetime
 from django.test import TestCase, RequestFactory
 from django.contrib.auth.models import User, AnonymousUser
 from rest_framework.authtoken.models import Token
 from graphql import GraphQLError
 from core.decorators import login_required
+from core.models import (UserNotification, ensure_profile_completion_notification)
+from core.serializers import ProfileSerializer
 from youpayroll.views import DRFTokenAuthGraphQLView
 
 
@@ -45,6 +48,69 @@ class DecoratorTest(TestCase):
             
         self.assertEqual(my_resolver.__name__, "my_resolver")
         self.assertEqual(my_resolver.__doc__, "My resolver docstring")
+
+
+class ProfileCompletionNotificationTest(TestCase):
+    def test_profile_save_does_not_create_action_required_notification(self):
+        user = User.objects.create_user(username="profile_sync")
+        profile = user.profile
+
+        profile.designation = "Consultant"
+        profile.save()
+
+        self.assertFalse(
+            UserNotification.objects.filter(
+                user=user,
+                notification_type="ACTION_REQUIRED",
+            ).exists()
+        )
+
+    def test_explicit_profile_completion_check_creates_notification(self):
+        user = User.objects.create_user(username="profile_incomplete")
+        profile = user.profile
+
+        ensure_profile_completion_notification(profile)
+
+        notification = UserNotification.objects.get(
+            user=user,
+            notification_type="ACTION_REQUIRED",
+        )
+        self.assertEqual(notification.title, "Complete your profile")
+        self.assertIn("First name", notification.message)
+
+    def test_complete_profile_does_not_create_notification(self):
+        user = User.objects.create_user(
+            username="profile_complete",
+            first_name="Complete",
+            last_name="User",
+        )
+        profile = user.profile
+        profile.designation = "Consultant"
+        profile.gender = "Male"
+        profile.dob = datetime.date(1990, 1, 1)
+        profile.save()
+
+        ensure_profile_completion_notification(profile)
+
+        self.assertFalse(
+            UserNotification.objects.filter(
+                user=user,
+                notification_type="ACTION_REQUIRED",
+            ).exists()
+        )
+
+
+class ProfilePictureValidationTest(TestCase):
+    def test_profile_picture_rejects_gif_data_uri(self):
+        user = User.objects.create_user(username="gif_profile")
+        serializer = ProfileSerializer(
+            user.profile,
+            data={'profile_picture': 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBA=='},
+            partial=True,
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('profile_picture', serializer.errors)
 
 
 class DRFTokenAuthGraphQLViewTest(TestCase):

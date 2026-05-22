@@ -1,5 +1,7 @@
 from rest_framework import viewsets, permissions, mixins
 from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
+from rest_framework import status
 from .models import Payee, BankDetails, BankDetailsAck
 from .serializers import PayeeSerializer, BankDetailSerializer, BankDetailAcknowledgementSerializer
 
@@ -14,9 +16,18 @@ class PayeeViewSet(viewsets.ReadOnlyModelViewSet):
         return Payee.objects.filter(user=self.request.user).order_by('hrm_id')
 
 class BankDetailViewSet(mixins.CreateModelMixin,
+                        mixins.UpdateModelMixin,
                         mixins.ListModelMixin,
                         mixins.RetrieveModelMixin,
                         viewsets.GenericViewSet):
+    """
+    Bank details have a single editable current record per payee.
+
+    POST creates the record when none exists; later POSTs update the current
+    record instead of creating duplicates. PATCH/PUT correct that same record.
+    Deletes are intentionally not exposed so acknowledgement history remains
+    tied to the bank-details row that was reviewed.
+    """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = BankDetailSerializer
     queryset = BankDetails.objects.all()
@@ -30,6 +41,25 @@ class BankDetailViewSet(mixins.CreateModelMixin,
         except Payee.DoesNotExist:
             raise ValidationError({"detail": "User is not registered as a payee."})
         serializer.save(payee=payee)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            payee = Payee.objects.get(user=request.user)
+        except Payee.DoesNotExist:
+            raise ValidationError({"detail": "User is not registered as a payee."})
+
+        bank_details = BankDetails.objects.filter(payee=payee).order_by('-id').first()
+        if bank_details:
+            serializer = self.get_serializer(
+                bank_details,
+                data=request.data,
+                partial=True,
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save(payee=payee)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        return super().create(request, *args, **kwargs)
 
 class BankDetailAcknowledgementViewSet(mixins.CreateModelMixin,
                                        mixins.ListModelMixin,
