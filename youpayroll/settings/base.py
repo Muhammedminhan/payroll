@@ -71,6 +71,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'youpayroll.middleware.XForwardedForMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -276,6 +277,12 @@ CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bo
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:5173,http://127.0.0.1:5173').split(',')
 CORS_ALLOW_CREDENTIALS = True
 
+TRUSTED_PROXY_IPS = [
+    proxy.strip()
+    for proxy in config('TRUSTED_PROXY_IPS', default='').split(',')
+    if proxy.strip()
+]
+
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -290,6 +297,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'google_login': config('GOOGLE_LOGIN_THROTTLE_RATE', default='20/minute'),
     },
+    'NUM_PROXIES': 0,
 }
 
 # In Production, these should be True.

@@ -2,6 +2,7 @@ from rest_framework import viewsets, permissions, mixins
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework import status
+from django.db import IntegrityError
 from .models import Payee, BankDetails, BankDetailsAck
 from .serializers import PayeeSerializer, BankDetailSerializer, BankDetailAcknowledgementSerializer
 
@@ -87,5 +88,8 @@ class BankDetailAcknowledgementViewSet(mixins.CreateModelMixin,
             raise ValidationError({"bank_details": "This field is required."})
         elif bank_details.payee != payee:
             raise ValidationError({"detail": "The specified bank details do not belong to this payee."})
-            
-        serializer.save(payee=payee, bank_details=bank_details)
+
+        try:
+            serializer.save(payee=payee, bank_details=bank_details)
+        except IntegrityError:
+            raise ValidationError({"bank_details": "Bank details have already been acknowledged."})

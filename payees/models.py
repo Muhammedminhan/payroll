@@ -1,6 +1,6 @@
 from django.utils.translation import gettext_lazy as _
-from django.core.validators import FileExtensionValidator
-from django.db import models
+from django.core.validators import EmailValidator, FileExtensionValidator
+from django.db import models, transaction
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 from django.contrib.auth.models import User
@@ -38,11 +38,13 @@ class Payee(SafeDeleteModel):
         return "**********" if self.pan_no else ""
 
     def save(self, *args, **kwargs):
-        if self.user_id and self.email:
-            User.objects.filter(pk=self.user_id).exclude(email=self.email).update(email=self.email)
-        elif self.user_id and not self.email:
-            self.email = self.user.email
-        super().save(*args, **kwargs)
+        with transaction.atomic():
+            if self.user_id and self.email:
+                EmailValidator()(self.email)
+                User.objects.filter(pk=self.user_id).exclude(email=self.email).update(email=self.email)
+            elif self.user_id and not self.email:
+                self.email = self.user.email
+            super().save(*args, **kwargs)
 
     def __str__(self):
         return self.full_name or self.hrm_id
@@ -117,6 +119,8 @@ class BankDetails(models.Model):
             effective_changes = changed_fields
 
         if effective_changes:
+            if self.pk:
+                self.acknowledgements.all().delete()
             self.payee_acknowledgement = False
             if update_fields is not None and 'payee_acknowledgement' not in update_fields:
                 kwargs['update_fields'] = list(update_fields) + ['payee_acknowledgement']
@@ -134,8 +138,8 @@ class BankDetailsAck(models.Model):
     payee = models.ForeignKey(Payee, on_delete=models.CASCADE,
                               related_name='bank_acknowledgement')
     # Link to the specific bank record being acknowledged to avoid race/ambiguity
-    bank_details = models.ForeignKey(BankDetails, on_delete=models.CASCADE, 
-                                     related_name='acknowledgements', null=True)
+    bank_details = models.ForeignKey(BankDetails, on_delete=models.CASCADE,
+                                     related_name='acknowledgements')
     uploaded_date = models.DateTimeField(auto_now_add=True)
     bank_details_screenshot = models.ImageField(
         upload_to=user_directory_path, validators=[validate_image,
@@ -153,7 +157,6 @@ class BankDetailsAck(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=['bank_details'],
-                condition=models.Q(bank_details__isnull=False),
                 name='unique_ack_per_bank_details',
             ),
         ]

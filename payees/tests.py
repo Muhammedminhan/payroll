@@ -84,6 +84,45 @@ class BankDetailsTest(TestCase):
         self.bank_details.refresh_from_db()
         self.assertFalse(self.bank_details.payee_acknowledgement)
 
+    def test_bank_details_change_deletes_stale_acknowledgements(self):
+        import io
+        from PIL import Image
+
+        old_image = io.BytesIO()
+        Image.new('RGB', (10, 10), color='white').save(old_image, format='PNG')
+        old_image.seek(0)
+        new_image = io.BytesIO()
+        Image.new('RGB', (10, 10), color='black').save(new_image, format='PNG')
+        new_image.seek(0)
+
+        BankDetailsAck.objects.create(
+            payee=self.payee,
+            bank_details=self.bank_details,
+            bank_details_screenshot=SimpleUploadedFile(
+                name='old_ack.png',
+                content=old_image.read(),
+                content_type='image/png',
+            ),
+        )
+
+        self.bank_details.ifsc_code = 'NEWIFSC123'
+        self.bank_details.save()
+
+        self.bank_details.refresh_from_db()
+        self.assertFalse(self.bank_details.payee_acknowledgement)
+        self.assertFalse(BankDetailsAck.objects.filter(bank_details=self.bank_details).exists())
+
+        BankDetailsAck.objects.create(
+            payee=self.payee,
+            bank_details=self.bank_details,
+            bank_details_screenshot=SimpleUploadedFile(
+                name='new_ack.png',
+                content=new_image.read(),
+                content_type='image/png',
+            ),
+        )
+        self.assertEqual(BankDetailsAck.objects.filter(bank_details=self.bank_details).count(), 1)
+
     def test_non_tracked_field_does_not_reset_acknowledgement(self):
         # account_holder_name is tracked, but let's assume we update nothing
         self.bank_details.save()
@@ -101,6 +140,42 @@ class BankDetailsTest(TestCase):
 
         self.payee.refresh_from_db()
         self.assertEqual(self.payee.email, 'updated@example.com')
+
+    def test_payee_save_validates_email_before_syncing_user_email(self):
+        self.user.email = 'old@example.com'
+        self.user.save()
+        self.payee.email = 'old@example.com'
+        self.payee.save()
+
+        self.payee.email = 'not-an-email'
+
+        with self.assertRaises(ValidationError):
+            self.payee.save()
+
+        self.user.refresh_from_db()
+        self.payee.refresh_from_db()
+        self.assertEqual(self.user.email, 'old@example.com')
+        self.assertEqual(self.payee.email, 'old@example.com')
+
+    def test_payee_save_rolls_back_user_email_sync_when_payee_save_fails(self):
+        self.user.email = 'old@example.com'
+        self.user.save()
+        self.payee.email = 'old@example.com'
+        self.payee.save()
+
+        other_user = User.objects.create_user(username='other_user')
+        Payee.objects.create(user=other_user, hrm_id='HR999')
+
+        self.payee.email = 'new@example.com'
+        self.payee.hrm_id = 'HR999'
+
+        with self.assertRaises(IntegrityError):
+            self.payee.save()
+
+        self.user.refresh_from_db()
+        self.payee.refresh_from_db()
+        self.assertEqual(self.user.email, 'old@example.com')
+        self.assertEqual(self.payee.email, 'old@example.com')
 
 
 from rest_framework.test import APIClient
@@ -258,6 +333,40 @@ class BankDetailAcknowledgementAPITest(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("Bank details have already been acknowledged", response.content.decode())
 
+    def test_create_acknowledgement_integrity_error_returns_validation_error(self):
+        BankDetailsAck.objects.create(
+            payee=self.payee,
+            bank_details=self.bank_details,
+            bank_details_screenshot=self.dummy_image,
+        )
+        import io
+        from PIL import Image
+
+        img_buffer = io.BytesIO()
+        Image.new('RGB', (10, 10), color='white').save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+        fresh_image = SimpleUploadedFile(
+            name='race_image.png',
+            content=img_buffer.read(),
+            content_type='image/png'
+        )
+
+        with patch(
+            'payees.serializers.BankDetailAcknowledgementSerializer.validate_bank_details',
+            new=lambda serializer, value: value,
+        ):
+            response = self.client.post(
+                '/api/payees/bank-acknowledgements/',
+                {
+                    'bank_details_screenshot': fresh_image,
+                    'bank_details': self.bank_details.id,
+                },
+                format='multipart'
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Bank details have already been acknowledged", response.content.decode())
+
     def test_acknowledgement_is_unique_per_bank_details(self):
         BankDetailsAck.objects.create(
             payee=self.payee,
@@ -271,6 +380,14 @@ class BankDetailAcknowledgementAPITest(TestCase):
                     payee=self.payee,
                     bank_details=self.bank_details,
                     bank_details_screenshot=self.dummy_image,
+                )
+
+    def test_acknowledgement_requires_bank_details_at_database_level(self):
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                BankDetailsAck.objects.create(
+                    payee=self.payee,
+                    bank_details_screenshot='legacy_ack.png',
                 )
 
     def test_approval_marks_bank_details_as_acknowledged(self):
@@ -402,6 +519,44 @@ class BankDetailsAckGraphQLTest(TestCase):
             'The specified bank details do not belong to this payee.',
             str(result['errors'][0]),
         )
+
+    def test_create_bank_details_ack_requires_bank_details_id_argument(self):
+        import io
+        from PIL import Image
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from graphene.test import Client
+        from youpayroll.schema import schema
+
+        img_buffer = io.BytesIO()
+        Image.new('RGB', (10, 10), color='white').save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+        screenshot = SimpleUploadedFile(
+            name='graphql_ack_missing_bank_details.png',
+            content=img_buffer.read(),
+            content_type='image/png'
+        )
+
+        mutation = """
+        mutation CreateAck($screenshot: Upload!) {
+            createBankDetailsAck(bankDetailScreenshot: $screenshot) {
+                bankDetailsAck {
+                    isApproved
+                }
+            }
+        }
+        """
+
+        class DummyContext:
+            user = self.user
+
+        result = Client(schema).execute(
+            mutation,
+            variable_values={'screenshot': screenshot},
+            context=DummyContext(),
+        )
+
+        self.assertIn('errors', result)
+        self.assertIn('bankDetailsId', str(result['errors'][0]))
 
 
 class ValidateImageTest(TestCase):

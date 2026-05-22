@@ -1,9 +1,10 @@
 from unittest.mock import patch
 import datetime
-from django.test import TestCase, RequestFactory
+from django.core.cache import cache
+from django.test import TestCase, RequestFactory, override_settings
 from django.contrib.auth.models import User, AnonymousUser
 from rest_framework.authtoken.models import Token
-from rest_framework.test import APIRequestFactory
+from rest_framework.test import APIClient, APIRequestFactory
 from graphql import GraphQLError
 from core.decorators import login_required
 from core.models import (UserNotification, ensure_profile_completion_notification)
@@ -105,6 +106,8 @@ class ProfileCompletionNotificationTest(TestCase):
 class GoogleLoginViewTest(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
+        self.client = APIClient()
+        cache.clear()
 
     @patch("core.views.id_token.verify_oauth2_token")
     def test_rejects_non_ygg_google_accounts(self, mock_verify):
@@ -154,6 +157,54 @@ class GoogleLoginViewTest(TestCase):
         self.assertEqual(User.objects.count(), 1)
         existing_user.refresh_from_db()
         self.assertEqual(existing_user.email, "consultant@yougotagift.com")
+
+    @override_settings(
+        TRUSTED_PROXY_IPS=['10.0.0.0/8'],
+    )
+    def test_google_login_throttle_uses_forwarded_client_ip_from_trusted_proxy(self):
+        trusted_proxy_request = {
+            'HTTP_X_FORWARDED_FOR': '203.0.113.9, 10.0.1.20',
+            'REMOTE_ADDR': '10.0.2.30',
+        }
+
+        for _ in range(20):
+            response = self.client.post('/api/google-login/', {}, format='json', **trusted_proxy_request)
+            self.assertEqual(response.status_code, 400)
+        throttled_response = self.client.post('/api/google-login/', {}, format='json', **trusted_proxy_request)
+
+        self.assertEqual(throttled_response.status_code, 429)
+
+        different_client_response = self.client.post(
+            '/api/google-login/',
+            {},
+            format='json',
+            HTTP_X_FORWARDED_FOR='203.0.113.10, 10.0.1.20',
+            REMOTE_ADDR='10.0.2.30',
+        )
+        self.assertEqual(different_client_response.status_code, 400)
+
+    @override_settings(
+        TRUSTED_PROXY_IPS=['10.0.0.0/8'],
+    )
+    def test_google_login_throttle_ignores_forwarded_ip_from_untrusted_peer(self):
+        for offset in range(20):
+            response = self.client.post(
+                '/api/google-login/',
+                {},
+                format='json',
+                HTTP_X_FORWARDED_FOR=f'203.0.113.{offset}',
+                REMOTE_ADDR='198.51.100.100',
+            )
+            self.assertEqual(response.status_code, 400)
+
+        throttled_response = self.client.post(
+            '/api/google-login/',
+            {},
+            format='json',
+            HTTP_X_FORWARDED_FOR='203.0.113.22',
+            REMOTE_ADDR='198.51.100.100',
+        )
+        self.assertEqual(throttled_response.status_code, 429)
 
 
 class ProfilePictureValidationTest(TestCase):

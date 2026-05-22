@@ -31,3 +31,7 @@ This is the React + Vite frontend for the YOUPayroll Management portal.
 -   **Dashboard Overview**: "Have a productive day!", Status Cards (Payslips, Documents).
 -   **Profile Sidebar**: Consultant details view.
 -   **Navigation**: Sidebar menu with active states.
+
+## Frontend Release Notes
+
+-   Bank-detail acknowledgement uploads must include the current bank-details id. For GraphQL clients, pass `bankDetailsId` to `createBankDetailsAck` along with `bankDetailScreenshot`. Screenshot-only calls now fail with a required-field error.
