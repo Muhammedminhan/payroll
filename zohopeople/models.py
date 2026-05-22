@@ -17,6 +17,10 @@ class ZohoPeopleFormToken(models.Model):
             models.UniqueConstraint(
                 fields=['singleton_lock'],
                 name='zoho_people_form_token_singleton'
+            ),
+            models.CheckConstraint(
+                check=models.Q(singleton_lock=True),
+                name='zoho_people_form_token_singleton_true'
             )
         ]
 
