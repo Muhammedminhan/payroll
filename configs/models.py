@@ -33,7 +33,7 @@ auditlog.register(TDS)
 
 class Component(models.Model):
     """
-    Model contains Components name and it's corresponding operations
+    Model contains Components name and its corresponding operations
     """
     component_name = models.CharField(max_length=100, unique=True)
     operation = models.CharField(max_length=10, choices=OPERATION_CHOICES)  # 'sum' or 'subtract'
