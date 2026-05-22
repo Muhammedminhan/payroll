@@ -82,12 +82,9 @@ class BankDetailAcknowledgementViewSet(mixins.CreateModelMixin,
         except Payee.DoesNotExist:
             raise ValidationError({"detail": "User is not registered as a payee."})
         
-        # Link explicit bank_details or fall back to the payee's latest active record
         bank_details = serializer.validated_data.get('bank_details')
         if not bank_details:
-            bank_details = BankDetails.objects.filter(payee=payee).order_by('-id').first()
-            if not bank_details:
-                raise ValidationError({"detail": "No bank details record found to acknowledge."})
+            raise ValidationError({"bank_details": "This field is required."})
         elif bank_details.payee != payee:
             raise ValidationError({"detail": "The specified bank details do not belong to this payee."})
             

@@ -241,25 +241,32 @@ class PayRecordRegisterAdmin(admin.ModelAdmin):
         super().save_related(request, form, formsets, change)
 
         pay_record_register = form.instance
+        component_values = []
+        for formset in formsets:
+            for inline_form in formset.forms:
+                cleaned_data = getattr(inline_form, 'cleaned_data', {})
+                if cleaned_data.get('DELETE'):
+                    continue
+                component_value = inline_form.instance
+                if isinstance(component_value, ComponentValue) and component_value.pk:
+                    component_values.append(component_value)
+        if not component_values:
+            component_values = list(ComponentValue.objects.filter(pay_record=pay_record_register))
 
         # Calculate the total based on component operations (sum or subtract)
         total = pay_record_register.amount + sum(
             component_value.value if component_value.component.operation == 'sum'
             else -component_value.value
-            for component_value in
-            ComponentValue.objects.filter(pay_record=pay_record_register)
+            for component_value in component_values
         )
 
-        # Update gross_amount and save the instance
         pay_record_register.gross_amount = total
-        pay_record_register.save()
-
         tds_percentage = Decimal(str(pay_record_register.tds_percentage or 0))  # Safe default to 0
         tds_amount = (pay_record_register.gross_amount * tds_percentage) / Decimal('100')
         total_net_income = pay_record_register.gross_amount - tds_amount
 
         pay_record_register.net_income = total_net_income
-        pay_record_register.save()
+        pay_record_register.save(update_fields=['gross_amount', 'net_income'])
 
 
 class Form16EntryAdmin(admin.ModelAdmin):

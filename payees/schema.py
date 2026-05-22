@@ -1,7 +1,7 @@
 import logging
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 import graphene
 from graphene_django.types import DjangoObjectType
@@ -172,6 +172,7 @@ class CreateBankDetailsAck(BaseMutation):
 
     class Arguments:
         bank_detail_screenshot = Upload(required=True)
+        bank_details_id = graphene.ID(required=True)
         is_approved = graphene.Boolean(required=False)
         correction_comments = graphene.String(required=False)
 
@@ -180,23 +181,29 @@ class CreateBankDetailsAck(BaseMutation):
     @classmethod
     def perform_mutation(cls, root, info, payee, **kwargs):
         bank_detail_screenshot = kwargs.get("bank_detail_screenshot")
+        bank_details_id = kwargs.get("bank_details_id")
         correction_comments = kwargs.get("correction_comments")
 
         # Validate and save image
         cls.validate_image_input(bank_detail_screenshot)
 
-        bank_details = BankDetails.objects.filter(payee=payee).order_by('-id').first()
-        if not bank_details:
-            raise GraphQLError("No bank details record found to acknowledge.")
+        try:
+            bank_details = BankDetails.objects.get(id=bank_details_id, payee=payee)
+        except (BankDetails.DoesNotExist, ValueError):
+            raise GraphQLError("The specified bank details do not belong to this payee.")
 
         # Save the BankDetailsAck instance
-        bank_details_ack = BankDetailsAck.objects.create(
-            payee=payee,
-            bank_details=bank_details,
-            bank_details_screenshot=bank_detail_screenshot,
-            is_approved=False,
-            correction_comments=correction_comments,
-        )
+        try:
+            bank_details_ack = BankDetailsAck.objects.create(
+                payee=payee,
+                bank_details=bank_details,
+                bank_details_screenshot=bank_detail_screenshot,
+                is_approved=False,
+                correction_comments=correction_comments,
+            )
+        except IntegrityError:
+            logger.exception("Failed to create bank-details acknowledgement.")
+            raise GraphQLError("Bank details have already been acknowledged.")
         return CreateBankDetailsAck(bank_details_ack=bank_details_ack)
 
 

@@ -4,6 +4,8 @@ from django.db import models
 from safedelete import SOFT_DELETE
 from safedelete.models import SafeDeleteModel
 from django.contrib.auth.models import User
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from auditlog.registry import auditlog
 from .upload_helpers import user_directory_path, validate_image
 from .constants import (STATUS_CHOICES, PAYEE_STATUS_HELP_TEXT)
@@ -23,10 +25,6 @@ class Payee(SafeDeleteModel):
     email = models.EmailField(max_length=100, null=True, blank=True)
     pan_no = models.CharField(max_length=10, unique=True, null=True,
                                blank=True)
-
-    @property
-    def masked_pan_no(self):
-        return "**********" if self.pan_no else ""
     date_of_joining = models.CharField(max_length=50, null=True, blank=True)
     address = models.TextField(null=True, blank=True)
     is_dark_mode = models.BooleanField(default=False,
@@ -35,10 +33,27 @@ class Payee(SafeDeleteModel):
     class Meta:
         verbose_name = _("Payee")
 
+    @property
+    def masked_pan_no(self):
+        return "**********" if self.pan_no else ""
+
+    def save(self, *args, **kwargs):
+        if self.user_id and self.email:
+            User.objects.filter(pk=self.user_id).exclude(email=self.email).update(email=self.email)
+        elif self.user_id and not self.email:
+            self.email = self.user.email
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.full_name or self.hrm_id
 
 auditlog.register(Payee)
+
+
+@receiver(post_save, sender=User)
+def sync_payee_email_from_user(sender, instance, **kwargs):
+    if instance.email:
+        Payee.objects.filter(user=instance).exclude(email=instance.email).update(email=instance.email)
 
 class BankDetails(models.Model):
     """ Stores the information of the Payee Bank Account details """
@@ -135,6 +150,13 @@ class BankDetailsAck(models.Model):
     class Meta:
         verbose_name = _("Bank Detail Acknowledgement")
         verbose_name_plural = _("Bank Detail Acknowledgements")
+        constraints = [
+            models.UniqueConstraint(
+                fields=['bank_details'],
+                condition=models.Q(bank_details__isnull=False),
+                name='unique_ack_per_bank_details',
+            ),
+        ]
 
     def __str__(self):
         return self.payee.full_name or self.payee.hrm_id or str(self.pk)

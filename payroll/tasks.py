@@ -1,5 +1,6 @@
 import logging
 
+import datetime
 import re
 from celery import shared_task
 from decimal import Decimal
@@ -11,6 +12,7 @@ import zipfile
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db import transaction
+from django.db.models import Q
 
 # For getting the named logger
 logger = logging.getLogger('celery_debug')
@@ -52,8 +54,6 @@ def run_pay_run_task(payrun_id):
                         continue
 
                     bank_details = BankDetails.objects.get(payee=payee, payee_acknowledgement=True)
-                    import datetime
-                    from django.db.models import Q
 
                     # Determine the end of the pay run month
                     if pay_run.month == 12:

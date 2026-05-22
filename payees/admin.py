@@ -43,8 +43,10 @@ class PayeeAdmin(admin.ModelAdmin):
         # Automatically trigger fetch on save
         try:
             fetch_details.delay(obj.hrm_id)
+            self.message_user(request, "Queued Zoho detail sync.", level=messages.INFO)
         except Exception as e:
             logger.error(f"Auto-fetch enqueue failed for {obj.hrm_id}: {e}")
+            self.message_user(request, f"Failed to queue Zoho detail sync: {e}", level=messages.ERROR)
 
     @admin.action(description="Fetch details from Zoho")
     def fetch_from_zoho_action(self, request, queryset):
@@ -98,18 +100,19 @@ class BankDetailsAdmin(admin.ModelAdmin):
     def acknowledge_button(self, obj):
         if not obj.payee_acknowledgement:
             try:
-                BankDetailsAck.objects.get(payee=obj.payee)
+                ack = BankDetailsAck.objects.get(bank_details=obj)
                 return format_html(
-                    '<a class="button" href="{}?payee={}">Acknowledge</a>',
-                    reverse('admin:payees_bankdetailsack_change', args=[
-                        BankDetailsAck.objects.get(payee=obj.payee).id]),
-                    obj.payee.id
+                    '<a class="button" href="{}?payee={}&bank_details={}">Acknowledge</a>',
+                    reverse('admin:payees_bankdetailsack_change', args=[ack.id]),
+                    obj.payee.id,
+                    obj.id,
                 )
             except BankDetailsAck.DoesNotExist:
                 return format_html(
-                    '<a class="button" href="{}?payee={}">Acknowledge</a>',
+                    '<a class="button" href="{}?payee={}&bank_details={}">Acknowledge</a>',
                     reverse('admin:payees_bankdetailsack_add'),
-                    obj.payee.id
+                    obj.payee.id,
+                    obj.id,
                 )
         return "Acknowledged"
 
@@ -136,9 +139,15 @@ class BankDetailsAckAdmin(admin.ModelAdmin):
         initial = super().get_changeform_initial_data(request)
         if not request.user.is_superuser:
             try:
-                initial['payee'] = Payee.objects.get(user=request.user).id
+                payee = Payee.objects.get(user=request.user)
+                initial['payee'] = payee.id
+                bank_details_id = request.GET.get('bank_details')
+                if bank_details_id and BankDetails.objects.filter(id=bank_details_id, payee=payee).exists():
+                    initial['bank_details'] = bank_details_id
             except Payee.DoesNotExist:
                 pass
+        elif request.GET.get('bank_details'):
+            initial['bank_details'] = request.GET['bank_details']
         return initial
 
     def save_model(self, request, obj, form, change):
@@ -153,15 +162,12 @@ class BankDetailsAckAdmin(admin.ModelAdmin):
 
         # After saving, update payee_acknowledgement if approved
         if obj.is_approved:
-            try:
-                bank_details = BankDetails.objects.get(payee=obj.payee)
-                if not bank_details.payee_acknowledgement:
-                    bank_details.payee_acknowledgement = True
-                    bank_details.save(update_fields=['payee_acknowledgement'])
-            except BankDetails.DoesNotExist:
-                pass
+            bank_details = obj.bank_details
+            if bank_details and not bank_details.payee_acknowledgement:
+                bank_details.payee_acknowledgement = True
+                bank_details.save(update_fields=['payee_acknowledgement'])
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, request, obj=None):
         # Superusers and HR can always add
         if request.user.is_superuser and not request.user.groups.filter(name__in=RESTRICTED_PAYEE_GROUPS).exists():
             return True
@@ -172,8 +178,8 @@ class BankDetailsAckAdmin(admin.ModelAdmin):
         except Payee.DoesNotExist:
             return False  # no payee, no permission
 
-        # Check if a BankDetailAck already exists
-        if BankDetailsAck.objects.filter(payee=payee).exists():
+        bank_details_id = request.GET.get('bank_details')
+        if bank_details_id and BankDetailsAck.objects.filter(bank_details_id=bank_details_id, payee=payee).exists():
             return False
 
         return True  # allow add if no ack exists yet

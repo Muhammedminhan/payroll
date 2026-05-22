@@ -1,7 +1,8 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.test import RequestFactory
 from unittest.mock import patch
 from payees.admin import PayeeAdmin
@@ -24,10 +25,16 @@ class PayeeAdminZohoSyncTest(TestCase):
         payee_user = User.objects.create_user(username='payee_user')
         payee = Payee(hrm_id='HR123', user=payee_user)
 
-        with patch('payees.admin.fetch_details.delay') as mock_delay:
+        with patch('payees.admin.fetch_details.delay') as mock_delay, \
+                patch.object(self.payee_admin, 'message_user') as mock_message_user:
             self.payee_admin.save_model(request, payee, form=None, change=False)
 
         mock_delay.assert_called_once_with('HR123')
+        mock_message_user.assert_called_once_with(
+            request,
+            "Queued Zoho detail sync.",
+            level=messages.INFO,
+        )
 
     def test_fetch_from_zoho_action_queues_fetch_details_tasks(self):
         request = self.factory.post('/admin/payees/payee/')
@@ -81,6 +88,19 @@ class BankDetailsTest(TestCase):
         # account_holder_name is tracked, but let's assume we update nothing
         self.bank_details.save()
         self.assertTrue(self.bank_details.payee_acknowledgement)
+
+    def test_payee_email_syncs_with_user_email(self):
+        self.payee.email = 'payee@example.com'
+        self.payee.save()
+
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, 'payee@example.com')
+
+        self.user.email = 'updated@example.com'
+        self.user.save()
+
+        self.payee.refresh_from_db()
+        self.assertEqual(self.payee.email, 'updated@example.com')
 
 
 from rest_framework.test import APIClient
@@ -179,18 +199,14 @@ class BankDetailAcknowledgementAPITest(TestCase):
             content_type='image/png'
         )
 
-    def test_create_acknowledgement_fallback_to_latest_bank_details(self):
+    def test_create_acknowledgement_requires_explicit_bank_details(self):
         response = self.client.post(
             '/api/payees/bank-acknowledgements/',
             {'bank_details_screenshot': self.dummy_image},
             format='multipart'
         )
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data['bank_details'], self.bank_details.id)
-        
-        ack = BankDetailsAck.objects.get(id=response.data['id'])
-        self.assertEqual(ack.bank_details, self.bank_details)
-        self.assertFalse(ack.is_approved)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("This field is required", response.content.decode())
 
     def test_create_acknowledgement_with_explicit_bank_details(self):
         response = self.client.post(
@@ -224,17 +240,38 @@ class BankDetailAcknowledgementAPITest(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("The specified bank details do not belong to this payee", response.content.decode())
 
-    def test_create_acknowledgement_no_bank_details_raises_validation_error(self):
-        # Delete existing bank details
-        self.bank_details.delete()
-        
+    def test_create_acknowledgement_duplicate_bank_details_rejected(self):
+        BankDetailsAck.objects.create(
+            payee=self.payee,
+            bank_details=self.bank_details,
+            bank_details_screenshot=self.dummy_image,
+        )
+
         response = self.client.post(
             '/api/payees/bank-acknowledgements/',
-            {'bank_details_screenshot': self.dummy_image},
+            {
+                'bank_details_screenshot': self.dummy_image,
+                'bank_details': self.bank_details.id,
+            },
             format='multipart'
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn("No bank details record found to acknowledge", response.content.decode())
+        self.assertIn("Bank details have already been acknowledged", response.content.decode())
+
+    def test_acknowledgement_is_unique_per_bank_details(self):
+        BankDetailsAck.objects.create(
+            payee=self.payee,
+            bank_details=self.bank_details,
+            bank_details_screenshot=self.dummy_image,
+        )
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                BankDetailsAck.objects.create(
+                    payee=self.payee,
+                    bank_details=self.bank_details,
+                    bank_details_screenshot=self.dummy_image,
+                )
 
     def test_approval_marks_bank_details_as_acknowledged(self):
         # Create an unapproved acknowledgement
@@ -281,9 +318,10 @@ class BankDetailsAckGraphQLTest(TestCase):
         )
 
         mutation = """
-        mutation CreateAck($screenshot: Upload!) {
+        mutation CreateAck($screenshot: Upload!, $bankDetailsId: ID!) {
             createBankDetailsAck(
                 bankDetailScreenshot: $screenshot,
+                bankDetailsId: $bankDetailsId,
                 isApproved: true
             ) {
                 bankDetailsAck {
@@ -298,7 +336,10 @@ class BankDetailsAckGraphQLTest(TestCase):
 
         result = Client(schema).execute(
             mutation,
-            variable_values={'screenshot': screenshot},
+            variable_values={
+                'screenshot': screenshot,
+                'bankDetailsId': str(self.bank_details.id),
+            },
             context=DummyContext(),
         )
 
@@ -310,6 +351,57 @@ class BankDetailsAckGraphQLTest(TestCase):
         self.assertFalse(ack.is_approved)
         self.bank_details.refresh_from_db()
         self.assertFalse(self.bank_details.payee_acknowledgement)
+
+    def test_create_bank_details_ack_rejects_bank_details_owned_by_another_payee(self):
+        import io
+        from PIL import Image
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from graphene.test import Client
+        from youpayroll.schema import schema
+
+        other_user = User.objects.create_user(username='other_graphql_payee')
+        other_payee = Payee.objects.create(user=other_user, hrm_id='HROTHER')
+        other_bank_details = BankDetails.objects.create(payee=other_payee)
+
+        img_buffer = io.BytesIO()
+        Image.new('RGB', (10, 10), color='white').save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+        screenshot = SimpleUploadedFile(
+            name='graphql_ack_wrong_owner.png',
+            content=img_buffer.read(),
+            content_type='image/png'
+        )
+
+        mutation = """
+        mutation CreateAck($screenshot: Upload!, $bankDetailsId: ID!) {
+            createBankDetailsAck(
+                bankDetailScreenshot: $screenshot,
+                bankDetailsId: $bankDetailsId
+            ) {
+                bankDetailsAck {
+                    isApproved
+                }
+            }
+        }
+        """
+
+        class DummyContext:
+            user = self.user
+
+        result = Client(schema).execute(
+            mutation,
+            variable_values={
+                'screenshot': screenshot,
+                'bankDetailsId': str(other_bank_details.id),
+            },
+            context=DummyContext(),
+        )
+
+        self.assertIn('errors', result)
+        self.assertIn(
+            'The specified bank details do not belong to this payee.',
+            str(result['errors'][0]),
+        )
 
 
 class ValidateImageTest(TestCase):

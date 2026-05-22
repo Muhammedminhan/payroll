@@ -29,8 +29,12 @@ FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY')
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://*.yougotagift.co',
-    'https://*.yougotagift.com',
+    origin.strip()
+    for origin in config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='https://*.yougotagift.co,https://*.yougotagift.com',
+    ).split(',')
+    if origin.strip()
 ]
 
 DEBUG = config('DEBUG', default=False, cast=bool)
@@ -280,6 +284,12 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.ScopedRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'google_login': config('GOOGLE_LOGIN_THROTTLE_RATE', default='20/minute'),
+    },
 }
 
 # In Production, these should be True.

@@ -135,6 +135,26 @@ class GoogleLoginViewTest(TestCase):
         user = User.objects.get(email="consultant@yougotagift.com")
         self.assertFalse(user.has_usable_password())
 
+    @patch("core.views.id_token.verify_oauth2_token")
+    def test_existing_user_lookup_is_case_insensitive(self, mock_verify):
+        existing_user = User.objects.create_user(
+            username="mixed_case_user",
+            email="Consultant@YouGotaGift.com",
+        )
+        mock_verify.return_value = {
+            "email": "consultant@yougotagift.com",
+            "given_name": "Consultant",
+            "family_name": "User",
+        }
+
+        request = self.factory.post("/api/google-login/", {"credential": "token"}, format="json")
+        response = GoogleLoginView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(User.objects.count(), 1)
+        existing_user.refresh_from_db()
+        self.assertEqual(existing_user.email, "consultant@yougotagift.com")
+
 
 class ProfilePictureValidationTest(TestCase):
     def test_profile_picture_rejects_gif_data_uri(self):

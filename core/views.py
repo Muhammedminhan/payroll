@@ -111,6 +111,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
 class GoogleLoginView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_scope = 'google_login'
 
     def post(self, request):
         logger.debug(f"GoogleLoginView.post data: {request.data}")
@@ -141,9 +142,8 @@ class GoogleLoginView(APIView):
                     status=status.HTTP_403_FORBIDDEN
                 )
 
-            try:
-                user = User.objects.get(email=email)
-            except User.DoesNotExist:
+            user = User.objects.filter(email__iexact=email).first()
+            if user is None:
                 # auto-creation behavior
                 username = email.split('@')[0]
                 # Ensure unique username
@@ -157,6 +157,9 @@ class GoogleLoginView(APIView):
                 )
                 user.set_unusable_password()
                 user.save()
+            elif user.email != email:
+                user.email = email
+                user.save(update_fields=['email'])
 
             token, _ = Token.objects.get_or_create(user=user)
             

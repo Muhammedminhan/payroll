@@ -53,10 +53,10 @@ Required for all non-test settings:
 FIELD_ENCRYPTION_KEY=...
 ```
 
-Generate a development key with:
+Generate a development key before running Django with:
 
 ```bash
-python manage.py generate_encryption_key
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
 Required for `production`, `qa`, and `sandbox` settings:
@@ -110,6 +110,8 @@ ALLOWED_HOSTS=localhost,127.0.0.1
 GOOGLE_CLIENT_ID=...
 CORS_ALLOW_ALL_ORIGINS=False
 CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+CSRF_TRUSTED_ORIGINS=https://*.yougotagift.co,https://*.yougotagift.com
+GOOGLE_LOGIN_THROTTLE_RATE=20/minute
 SECURE_SSL_REDIRECT=False
 SESSION_COOKIE_SECURE=False
 CSRF_COOKIE_SECURE=False
@@ -200,3 +202,4 @@ Nginx configs are committed under each environment directory. The Vinton Gray Ce
 - GraphQL uses token authentication through project decorators; REST uses DRF token/session auth.
 - Audit logging is enabled on sensitive models through `django-auditlog`.
 - Pay run and Form 16 tasks include idempotency guards; keep those guarantees when changing task behavior.
+- `POST /api/payees/bank-details/` creates the current bank-details row for a payee; later POSTs update that same current row and return `200 OK`.

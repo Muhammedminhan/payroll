@@ -54,3 +54,8 @@ class BankDetailAcknowledgementSerializer(serializers.ModelSerializer):
             'is_approved', 'correction_comments', 'bank_details'
         ]
         read_only_fields = ['payee', 'uploaded_date', 'is_approved', 'correction_comments']
+
+    def validate_bank_details(self, value):
+        if BankDetailsAck.objects.filter(bank_details=value).exists():
+            raise serializers.ValidationError("Bank details have already been acknowledged.")
+        return value
