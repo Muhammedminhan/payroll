@@ -252,6 +252,13 @@ class BankDetailAPITest(TestCase):
         self.assertEqual(create_response.status_code, 201)
         self.assertEqual(update_response.status_code, 200)
 
+    def test_bank_details_are_unique_per_payee_at_database_level(self):
+        BankDetails.objects.create(payee=self.payee, bank_name='First Bank')
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                BankDetails.objects.create(payee=self.payee, bank_name='Duplicate Bank')
+
     def test_patch_corrects_bank_details_and_resets_acknowledgement(self):
         bank_details = BankDetails.objects.create(
             payee=self.payee,

@@ -104,6 +104,12 @@ class BankDetails(models.Model):
     class Meta:
         verbose_name = _("Bank Detail")
         verbose_name_plural = _("Bank Details")
+        constraints = [
+            models.UniqueConstraint(
+                fields=['payee'],
+                name='unique_bank_details_per_payee',
+            ),
+        ]
 
     def save(self, *args, **kwargs):
         # Reset acknowledgement if tracked fields changed

@@ -2,7 +2,7 @@ from rest_framework import viewsets, permissions, mixins
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework import status
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from .models import Payee, BankDetails, BankDetailsAck
 from .serializers import PayeeSerializer, BankDetailSerializer, BankDetailAcknowledgementSerializer
 
@@ -49,8 +49,39 @@ class BankDetailViewSet(mixins.CreateModelMixin,
         except Payee.DoesNotExist:
             raise ValidationError({"detail": "User is not registered as a payee."})
 
-        bank_details = BankDetails.objects.filter(payee=payee).order_by('-id').first()
-        if bank_details:
+        try:
+            with transaction.atomic():
+                Payee.objects.select_for_update().get(pk=payee.pk)
+                bank_details = (
+                    BankDetails.objects
+                    .select_for_update()
+                    .filter(payee=payee)
+                    .order_by('-id')
+                    .first()
+                )
+                if bank_details:
+                    serializer = self.get_serializer(
+                        bank_details,
+                        data=request.data,
+                        partial=True,
+                    )
+                    serializer.is_valid(raise_exception=True)
+                    serializer.save(payee=payee)
+                    return Response(serializer.data, status=status.HTTP_200_OK)
+
+                serializer = self.get_serializer(data=request.data)
+                serializer.is_valid(raise_exception=True)
+                serializer.save(payee=payee)
+                headers = self.get_success_headers(serializer.data)
+                return Response(
+                    serializer.data,
+                    status=status.HTTP_201_CREATED,
+                    headers=headers,
+                )
+        except IntegrityError:
+            bank_details = BankDetails.objects.filter(payee=payee).order_by('-id').first()
+            if not bank_details:
+                raise
             serializer = self.get_serializer(
                 bank_details,
                 data=request.data,
@@ -59,8 +90,6 @@ class BankDetailViewSet(mixins.CreateModelMixin,
             serializer.is_valid(raise_exception=True)
             serializer.save(payee=payee)
             return Response(serializer.data, status=status.HTTP_200_OK)
-
-        return super().create(request, *args, **kwargs)
 
 class BankDetailAcknowledgementViewSet(mixins.CreateModelMixin,
                                        mixins.ListModelMixin,
